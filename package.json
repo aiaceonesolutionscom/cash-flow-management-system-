@@ -1,0 +1,14 @@
+{
+  "name": "expense-cash-flow-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-quality Expense & Cash Flow Management System for 3 Companies in PKR",
+  "scripts": {
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "test": "cd server && npm run test",
+    "seed": "cd server && npm run prisma:seed",
+    "build": "cd server && npm run build && cd ../client && npm run build"
+  },
+  "keywords": ["finance", "cashflow", "expense-management", "pkr", "react", "postgresql", "prisma"]
+}

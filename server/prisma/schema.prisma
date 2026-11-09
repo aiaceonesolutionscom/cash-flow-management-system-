@@ -1,0 +1,173 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AccountType {
+  CASH
+  BANK
+  WALLET
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionType {
+  CASH_IN
+  CASH_OUT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  TRANSFER
+  BALANCE_ADJUST
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String   @default("System Administrator")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+model Company {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  code         String        @unique
+  currency     String        @default("PKR")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  accounts     Account[]
+  categories   Category[]
+  transactions Transaction[]
+  transfers    Transfer[]
+
+  @@map("companies")
+}
+
+model Account {
+  id             String        @id @default(uuid())
+  companyId      String        @map("company_id")
+  name           String
+  type           AccountType
+  openingBalance Decimal       @default(0.00) @map("opening_balance") @db.Decimal(15, 2)
+  currentBalance Decimal       @default(0.00) @map("current_balance") @db.Decimal(15, 2)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+  transfersFrom  Transfer[]    @relation("TransfersFrom")
+  transfersTo    Transfer[]    @relation("TransfersTo")
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("accounts")
+}
+
+model Category {
+  id           String        @id @default(uuid())
+  companyId    String?       @map("company_id")
+  name         String
+  type         CategoryType
+  isDefault    Boolean       @default(false) @map("is_default")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([companyId, name, type])
+  @@index([companyId])
+  @@map("categories")
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  companyId   String          @map("company_id")
+  accountId   String          @map("account_id")
+  categoryId  String          @map("category_id")
+  type        TransactionType
+  amount      Decimal         @db.Decimal(15, 2)
+  party       String          // Received From or Paid To / Vendor
+  paymentDate DateTime        @map("payment_date")
+  referenceNo String?         @map("reference_no")
+  description String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  account     Account         @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  category    Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  attachments Attachment[]
+
+  @@index([companyId])
+  @@index([accountId])
+  @@index([categoryId])
+  @@index([paymentDate])
+  @@index([type])
+  @@map("transactions")
+}
+
+model Transfer {
+  id            String   @id @default(uuid())
+  companyId     String   @map("company_id")
+  fromAccountId String   @map("from_account_id")
+  toAccountId   String   @map("to_account_id")
+  amount        Decimal  @db.Decimal(15, 2)
+  transferDate  DateTime @map("transfer_date")
+  referenceNo   String?  @map("reference_no")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromAccount   Account  @relation("TransfersFrom", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  toAccount     Account  @relation("TransfersTo", fields: [toAccountId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([fromAccountId])
+  @@index([toAccountId])
+  @@index([transferDate])
+  @@map("transfers")
+}
+
+model Attachment {
+  id            String      @id @default(uuid())
+  transactionId String      @map("transaction_id")
+  filename      String
+  originalName  String      @map("original_name")
+  mimeType      String      @map("mime_type")
+  size          Int
+  filePath      String      @map("file_path")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("attachments")
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  action    AuditAction
+  entity    String
+  entityId  String?     @map("entity_id")
+  details   Json?
+  ipAddress String?     @map("ip_address")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
