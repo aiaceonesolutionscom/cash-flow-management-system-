@@ -7,7 +7,8 @@ import {
   Building2,
   Tag,
   BarChart3,
-  Menu
+  Menu,
+  Settings
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -35,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'companies', label: 'Company Overview', icon: Building2 },
     { id: 'categories', label: 'Expense Categories', icon: Tag },
     { id: 'reports', label: 'Financial Reports', icon: BarChart3 },
+    { id: 'settings', label: 'Profile & Settings', icon: Settings },
   ];
 
   const handleTabClick = (tabId: string) => {

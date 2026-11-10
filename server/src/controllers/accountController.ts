@@ -27,6 +27,26 @@ export const getAccounts = async (req: Request, res: Response): Promise<void> =>
       ]
     });
 
+    // When "All Companies" is selected, return the 3 consolidated account types (Cash, Bank, Wallet)
+    // with combined balances across all companies so the user doesn't see 9 duplicate accounts!
+    if (!companyId || companyId === 'all') {
+      const consolidated: Record<string, any> = {
+        CASH: { id: 'CASH', name: 'Cash Account', type: 'CASH', openingBalance: '0.00', currentBalance: '0.00', company: { name: 'Combined' } },
+        BANK: { id: 'BANK', name: 'Bank Account', type: 'BANK', openingBalance: '0.00', currentBalance: '0.00', company: { name: 'Combined' } },
+        WALLET: { id: 'WALLET', name: 'Wallet Account', type: 'WALLET', openingBalance: '0.00', currentBalance: '0.00', company: { name: 'Combined' } }
+      };
+
+      for (const acc of accounts) {
+        if (consolidated[acc.type]) {
+          consolidated[acc.type].openingBalance = new Decimal(consolidated[acc.type].openingBalance).plus(acc.openingBalance.toString()).toFixed(2);
+          consolidated[acc.type].currentBalance = new Decimal(consolidated[acc.type].currentBalance).plus(acc.currentBalance.toString()).toFixed(2);
+        }
+      }
+
+      res.json({ success: true, accounts: Object.values(consolidated) });
+      return;
+    }
+
     res.json({ success: true, accounts });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch accounts' });

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { PlusCircle, Search, Trash2, ArrowUpRight, Paperclip, Loader2, RefreshCw } from 'lucide-react';
+import { PlusCircle, Search, Trash2, ArrowUpRight, Paperclip, Loader2, RefreshCw, Calendar } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
-import { Transaction, Account, Category } from '../types';
+import { Transaction, Category } from '../types';
 import { format } from 'date-fns';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { Pagination } from '../components/common/Pagination';
+import { ReceiptModal } from '../components/common/ReceiptModal';
+import { UndoToast } from '../components/common/UndoToast';
 
 interface CashOutPageProps {
   onOpenCreate: () => void;
@@ -20,23 +22,41 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [accountFilter, setAccountFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; party: string; amount: string; category: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [undoSnapshot, setUndoSnapshot] = useState<any | null>(null);
+  const [activeReceipt, setActiveReceipt] = useState<{
+    attachmentId: string;
+    originalName: string;
+    mimeType: string;
+    title: string;
+    amount: string;
+    party: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchDropdowns = async () => {
       try {
-        const [accRes, catRes] = await Promise.all([
-          api.get('/accounts', { params: { companyId: selectedCompanyId } }),
-          api.get('/categories', { params: { companyId: selectedCompanyId, type: 'EXPENSE' } })
-        ]);
-        if (accRes.data.success) setAccounts(accRes.data.accounts);
-        if (catRes.data.success) setCategories(catRes.data.categories);
+        const catRes = await api.get('/categories', { params: { companyId: selectedCompanyId, type: 'EXPENSE' } });
+        if (catRes.data.success) {
+          const rawCats: Category[] = catRes.data.categories || [];
+          if (!selectedCompanyId || selectedCompanyId === 'all') {
+            const seen = new Set<string>();
+            const uniqueCats = rawCats.filter((c) => {
+              const key = c.name.trim().toLowerCase();
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            setCategories(uniqueCats);
+          } else {
+            setCategories(rawCats);
+          }
+        }
       } catch (e) {
         console.error(e);
       }
@@ -50,7 +70,7 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
       const params: any = {
         companyId: selectedCompanyId,
         search: searchTerm || undefined,
-        accountId: accountFilter !== 'all' ? accountFilter : undefined,
+        accountType: accountFilter !== 'all' ? accountFilter : undefined,
         categoryId: categoryFilter !== 'all' ? categoryFilter : undefined,
         page,
         limit
@@ -81,10 +101,26 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    const targetSnapshot = transactions.find((t) => t.id === deleteTarget.id);
+
     try {
       setIsDeleting(true);
       const res = await api.delete(`/cash-out/${deleteTarget.id}`);
       if (res.data.success) {
+        if (targetSnapshot) {
+          setUndoSnapshot({
+            id: targetSnapshot.id,
+            companyId: targetSnapshot.companyId,
+            accountId: targetSnapshot.accountId,
+            categoryId: targetSnapshot.categoryId,
+            type: targetSnapshot.type,
+            amount: targetSnapshot.amount,
+            party: targetSnapshot.party,
+            paymentDate: targetSnapshot.paymentDate,
+            referenceNo: targetSnapshot.referenceNo,
+            description: targetSnapshot.description
+          });
+        }
         setDeleteTarget(null);
         triggerRefresh();
       }
@@ -92,6 +128,19 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
       alert(err.response?.data?.message || 'Failed to delete record');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!undoSnapshot) return;
+    try {
+      const res = await api.post('/transactions/restore', undoSnapshot);
+      if (res.data.success) {
+        setUndoSnapshot(null);
+        triggerRefresh();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to restore record');
     }
   };
 
@@ -166,13 +215,16 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
         <div className="flex items-center space-x-2 w-full sm:w-auto">
           <select
             value={accountFilter}
-            onChange={(e) => setAccountFilter(e.target.value)}
-            className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
+            onChange={(e) => {
+              setAccountFilter(e.target.value);
+              setPage(1);
+            }}
+            className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-semibold cursor-pointer"
           >
-            <option value="all">All Accounts</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.name} ({a.type})</option>
-            ))}
+            <option value="all">All Payment Types</option>
+            <option value="CASH">💵 Cash</option>
+            <option value="BANK">🏦 Bank</option>
+            <option value="WALLET">📱 Wallet</option>
           </select>
 
           <select
@@ -200,62 +252,69 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
             No Cash Out records found matching the current filters.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs min-w-[700px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Company</th>
-                  <th className="py-3 px-4">Paid To / Vendor</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Account</th>
-                  <th className="py-3 px-4">Reference</th>
-                  <th className="py-3 px-4 text-right">Amount (PKR)</th>
-                  <th className="py-3 px-4 text-center">Receipt</th>
-                  <th className="py-3 px-4 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                      {format(new Date(tx.paymentDate), 'yyyy-MM-dd')}
-                    </td>
-                    <td className="py-3 px-4 font-medium text-slate-800">{tx.company.name}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-900">
-                      <div>{tx.party}</div>
-                      {tx.description && <div className="text-[10px] text-slate-400 font-normal">{tx.description}</div>}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium">
+          <>
+            {/* Mobile Card View (Zero horizontal scroll needed - 100% visible on mobile) */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {transactions.map((tx) => (
+                <div key={tx.id} className="p-4 space-y-2.5 hover:bg-slate-50/70 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1.5 text-[11px] text-slate-500 font-medium">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{format(new Date(tx.paymentDate), 'dd MMM yyyy')}</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-slate-700 font-semibold">{tx.company.name}</span>
+                    </div>
+                    <div className="text-sm font-bold text-rose-600 tabular-nums">
+                      -{formatPKR(tx.amount)}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">{tx.party}</div>
+                    {tx.description && <div className="text-[11px] text-slate-500 mt-0.5">{tx.description}</div>}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold">
                         {tx.category.name}
                       </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
-                        {tx.account.name}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                        tx.account.type === 'CASH'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : tx.account.type === 'BANK'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-purple-50 text-purple-700'
+                      }`}>
+                        {tx.account.type === 'CASH' ? '💵 Cash' : tx.account.type === 'BANK' ? '🏦 Bank' : '📱 Wallet'}
                       </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">{tx.referenceNo || '—'}</td>
-                    <td className="py-3 px-4 text-right font-bold text-rose-600 tabular-nums">
-                      -{formatPKR(tx.amount)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {tx.attachments && tx.attachments.length > 0 ? (
-                        <a
-                          href={tx.attachments[0].filePath}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center text-blue-600 hover:text-blue-800"
-                          title="View receipt"
-                        >
-                          <Paperclip className="w-3.5 h-3.5" />
-                        </a>
-                      ) : (
-                        <span className="text-slate-300">—</span>
+                      {tx.referenceNo && (
+                        <span className="text-[10px] font-mono text-slate-400">#{tx.referenceNo}</span>
                       )}
-                    </td>
-                    <td className="py-3 px-4 text-center">
+                    </div>
+
+                    <div className="flex items-center space-x-1.5">
+                      {tx.attachments && tx.attachments.length > 0 && tx.attachments[0] && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const att = tx.attachments![0];
+                            setActiveReceipt({
+                              attachmentId: att.id,
+                              originalName: att.originalName,
+                              mimeType: att.mimeType,
+                              title: 'Cash Out / Expense Receipt',
+                              amount: formatPKR(tx.amount),
+                              party: tx.party
+                            });
+                          }}
+                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[11px] transition-colors"
+                        >
+                          <Paperclip className="w-3 h-3" />
+                          <span>Receipt</span>
+                        </button>
+                      )}
+
                       <button
                         onClick={() => setDeleteTarget({
                           id: tx.id,
@@ -264,16 +323,108 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
                           category: tx.category.name
                         })}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title="Delete Cash Out"
+                        title="Delete Record"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Full Data Table (Desktop >= md screens) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[700px]">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Company</th>
+                    <th className="py-3 px-4">Paid To / Vendor</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Account</th>
+                    <th className="py-3 px-4">Reference</th>
+                    <th className="py-3 px-4 text-right">Amount (PKR)</th>
+                    <th className="py-3 px-4 text-center">Receipt</th>
+                    <th className="py-3 px-4 text-center">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {transactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                        {format(new Date(tx.paymentDate), 'yyyy-MM-dd')}
+                      </td>
+                      <td className="py-3 px-4 font-medium text-slate-800">{tx.company.name}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-900">
+                        <div>{tx.party}</div>
+                        {tx.description && <div className="text-[10px] text-slate-400 font-normal">{tx.description}</div>}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium">
+                          {tx.category.name}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          tx.account.type === 'CASH'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : tx.account.type === 'BANK'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-purple-50 text-purple-700'
+                        }`}>
+                          {tx.account.type === 'CASH' ? '💵 Cash' : tx.account.type === 'BANK' ? '🏦 Bank' : '📱 Wallet'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">{tx.referenceNo || '—'}</td>
+                      <td className="py-3 px-4 text-right font-bold text-rose-600 tabular-nums">
+                        -{formatPKR(tx.amount)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {tx.attachments && tx.attachments.length > 0 && tx.attachments[0] ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const att = tx.attachments![0];
+                              setActiveReceipt({
+                                attachmentId: att.id,
+                                originalName: att.originalName,
+                                mimeType: att.mimeType,
+                                title: 'Cash Out / Expense Receipt',
+                                amount: formatPKR(tx.amount),
+                                party: tx.party
+                              });
+                            }}
+                            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[11px] transition-colors cursor-pointer"
+                            title="View & Download Receipt"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            <span>Receipt</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => setDeleteTarget({
+                            id: tx.id,
+                            party: tx.party || 'Vendor',
+                            amount: String(tx.amount),
+                            category: tx.category.name
+                          })}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Delete Cash Out"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Pagination Bar */}
@@ -301,6 +452,27 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
         isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      {/* Receipt Preview Lightbox Modal */}
+      <ReceiptModal
+        isOpen={!!activeReceipt}
+        onClose={() => setActiveReceipt(null)}
+        attachmentId={activeReceipt?.attachmentId}
+        originalName={activeReceipt?.originalName}
+        mimeType={activeReceipt?.mimeType}
+        title={activeReceipt?.title}
+        amount={activeReceipt?.amount}
+        party={activeReceipt?.party}
+      />
+
+      {/* Floating Undo Toast */}
+      <UndoToast
+        isOpen={!!undoSnapshot}
+        message={`Deleted Cash Out record for "${undoSnapshot?.party}" (PKR ${formatPKR(undoSnapshot?.amount || '0')})`}
+        onUndo={handleUndo}
+        onClose={() => setUndoSnapshot(null)}
+        durationMs={8000}
       />
     </div>
   );

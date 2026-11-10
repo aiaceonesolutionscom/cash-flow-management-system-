@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
 import { prisma } from '../prisma';
 import { Decimal } from 'decimal.js';
 import { AuditAction, TransactionType } from '@prisma/client';
@@ -59,8 +60,9 @@ export const createCashOut = async (req: Request, res: Response): Promise<void> 
         }
       });
 
-      // 4. Handle attachment if uploaded
+      // 4. Handle attachment if uploaded (saved as bytes in PostgreSQL)
       if (req.file) {
+        const fileBuffer = req.file.buffer || (req.file.path ? fs.readFileSync(req.file.path) : null);
         await tx.attachment.create({
           data: {
             transactionId: transaction.id,
@@ -68,7 +70,8 @@ export const createCashOut = async (req: Request, res: Response): Promise<void> 
             originalName: req.file.originalname,
             mimeType: req.file.mimetype,
             size: req.file.size,
-            filePath: `/uploads/${req.file.filename}`
+            filePath: `/uploads/${req.file.filename}`,
+            fileData: fileBuffer
           }
         });
       }
@@ -99,7 +102,7 @@ export const createCashOut = async (req: Request, res: Response): Promise<void> 
 
 export const getCashOutList = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { companyId, accountId, categoryId, startDate, endDate, search, page = '1', limit = '50' } = req.query;
+    const { companyId, accountId, accountType, categoryId, startDate, endDate, search, page = '1', limit = '50' } = req.query;
 
     const where: any = { type: TransactionType.CASH_OUT };
 
@@ -109,8 +112,24 @@ export const getCashOutList = async (req: Request, res: Response): Promise<void>
     if (accountId && accountId !== 'all') {
       where.accountId = accountId as string;
     }
+    if (accountType && accountType !== 'all') {
+      where.account = { type: accountType };
+    }
     if (categoryId && categoryId !== 'all') {
-      where.categoryId = categoryId as string;
+      if (!companyId || companyId === 'all') {
+        const cat = await prisma.category.findUnique({ where: { id: categoryId as string } });
+        if (cat) {
+          const siblingCats = await prisma.category.findMany({
+            where: { name: cat.name, type: 'EXPENSE' },
+            select: { id: true }
+          });
+          where.categoryId = { in: siblingCats.map(c => c.id) };
+        } else {
+          where.categoryId = categoryId as string;
+        }
+      } else {
+        where.categoryId = categoryId as string;
+      }
     }
     if (startDate || endDate) {
       where.paymentDate = {};
@@ -229,6 +248,7 @@ export const updateCashOut = async (req: Request, res: Response): Promise<void> 
       });
 
       if (req.file) {
+        const fileBuffer = req.file.buffer || (req.file.path ? fs.readFileSync(req.file.path) : null);
         await tx.attachment.create({
           data: {
             transactionId: txn.id,
@@ -236,7 +256,8 @@ export const updateCashOut = async (req: Request, res: Response): Promise<void> 
             originalName: req.file.originalname,
             mimeType: req.file.mimetype,
             size: req.file.size,
-            filePath: `/uploads/${req.file.filename}`
+            filePath: `/uploads/${req.file.filename}`,
+            fileData: fileBuffer
           }
         });
       }

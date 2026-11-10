@@ -15,6 +15,7 @@ import { ReportsPage } from './pages/ReportsPage';
 // Quick Action Modals
 import { CashInModal } from './components/modals/CashInModal';
 import { CashOutModal } from './components/modals/CashOutModal';
+import { SettingsModal } from './components/common/SettingsModal';
 
 const MainLayout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -30,6 +31,7 @@ const MainLayout: React.FC = () => {
   // Quick Action Modal states
   const [isCashInOpen, setIsCashInOpen] = useState<boolean>(false);
   const [isCashOutOpen, setIsCashOutOpen] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   React.useEffect(() => {
     if (window.location.pathname !== '/') {
@@ -78,7 +80,13 @@ const MainLayout: React.FC = () => {
       {/* Sidebar Navigation (with Desktop and Mobile Drawer modes) */}
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={(tab) => {
+          if (tab === 'settings') {
+            setIsSettingsOpen(true);
+          } else {
+            setCurrentTab(tab);
+          }
+        }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         isOpenMobile={isMobileMenuOpen}
@@ -90,6 +98,7 @@ const MainLayout: React.FC = () => {
         <Header
           onOpenCashIn={() => setIsCashInOpen(true)}
           onOpenCashOut={() => setIsCashOutOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
 
@@ -113,6 +122,12 @@ const MainLayout: React.FC = () => {
         onSuccess={triggerRefresh}
         companies={companies}
         initialCompanyId={selectedCompanyId}
+      />
+
+      {/* Admin Profile & Security Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </div>
   );

@@ -4,12 +4,15 @@ import { api } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Category, CategoryType, Company } from '../types';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { Pagination } from '../components/common/Pagination';
 
 export const CategoriesPage: React.FC = () => {
   const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName, companies } = useFilters();
   const [categories, setCategories] = useState<Category[]>([]);
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(10);
 
   // Create Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -31,7 +34,24 @@ export const CategoriesPage: React.FC = () => {
       };
       const res = await api.get('/categories', { params });
       if (res.data.success) {
-        setCategories(res.data.categories);
+        const rawCats: Category[] = res.data.categories || [];
+        if (!selectedCompanyId || selectedCompanyId === 'all') {
+          const map = new Map<string, Category>();
+          for (const c of rawCats) {
+            const key = `${c.name.trim().toLowerCase()}_${c.type}`;
+            if (!map.has(key)) {
+              map.set(key, { ...c, company: undefined });
+            } else {
+              const existing = map.get(key)!;
+              if (existing._count && c._count) {
+                existing._count.transactions += (c._count.transactions || 0);
+              }
+            }
+          }
+          setCategories(Array.from(map.values()));
+        } else {
+          setCategories(rawCats);
+        }
       }
     } catch (err) {
       console.error('Failed to load categories', err);
@@ -178,49 +198,95 @@ export const CategoriesPage: React.FC = () => {
             No categories found matching criteria.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs min-w-[600px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="py-3 px-4">Category Name</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Scope</th>
-                  <th className="py-3 px-4">Linked Transactions</th>
-                  <th className="py-3 px-4 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {categories.map((cat) => (
-                  <tr key={cat.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-4 font-semibold text-slate-900">{cat.name}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+          <>
+            {/* Mobile Cards for Categories */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {categories.slice((page - 1) * limit, page * limit).map((cat) => (
+                <div key={cat.id} className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                  <div className="min-w-0">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-xs text-slate-900 truncate">{cat.name}</span>
+                      <span className={`px-2 py-0.2 rounded-full text-[9px] font-bold shrink-0 ${
                         cat.type === 'INCOME' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
                       }`}>
                         {cat.type}
                       </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {cat.company ? `${cat.company.name}` : 'Global Default'}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 font-medium">
-                      {cat._count?.transactions || 0} transactions
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => handleDeleteClick(cat)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {cat.company ? cat.company.name : 'Global Default'} • <span className="text-slate-600 font-semibold">{cat._count?.transactions || 0} txn</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleDeleteClick(cat)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
+                    title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table for Categories */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[600px]">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Category Name</th>
+                    <th className="py-3 px-4">Type</th>
+                    <th className="py-3 px-4">Scope</th>
+                    <th className="py-3 px-4">Linked Transactions</th>
+                    <th className="py-3 px-4 text-center">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {categories.slice((page - 1) * limit, page * limit).map((cat) => (
+                    <tr key={cat.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3 px-4 font-semibold text-slate-900">{cat.name}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          cat.type === 'INCOME' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                        }`}>
+                          {cat.type}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        {cat.company ? `${cat.company.name}` : 'Global Default'}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 font-medium">
+                        {cat._count?.transactions || 0} transactions
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => handleDeleteClick(cat)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
+
+        {/* Dynamic Category Pagination */}
+        <Pagination
+          currentPage={page}
+          totalPages={Math.ceil(categories.length / limit) || 1}
+          totalItems={categories.length}
+          itemsPerPage={limit}
+          onPageChange={setPage}
+          onItemsPerPageChange={(l) => {
+            setLimit(l);
+            setPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
 
       {/* Create Modal */}

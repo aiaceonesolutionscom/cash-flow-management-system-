@@ -149,6 +149,7 @@ model Attachment {
   mimeType      String      @map("mime_type")
   size          Int
   filePath      String      @map("file_path")
+  fileData      Bytes?      @map("file_data")
   createdAt     DateTime    @default(now()) @map("created_at")
 
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)

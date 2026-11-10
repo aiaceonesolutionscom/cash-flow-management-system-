@@ -14,6 +14,7 @@ import * as transactionController from '../controllers/transactionController';
 import * as dashboardController from '../controllers/dashboardController';
 import * as reportController from '../controllers/reportController';
 import * as auditController from '../controllers/auditController';
+import * as attachmentController from '../controllers/attachmentController';
 
 const router = Router();
 
@@ -21,6 +22,8 @@ const router = Router();
 router.post('/auth/login', authController.login);
 router.post('/auth/logout', authController.logout);
 router.get('/auth/me', requireAdmin, authController.getMe);
+router.patch('/auth/profile', requireAdmin, authController.updateProfile);
+router.post('/auth/change-password', requireAdmin, authController.changePassword);
 
 // Companies
 router.get('/companies', requireAdmin, companyController.getCompanies);
@@ -56,6 +59,7 @@ router.delete('/transfers/:id', requireAdmin, transferController.deleteTransfer)
 
 // Centralized Transactions Ledger
 router.get('/transactions', requireAdmin, transactionController.getTransactions);
+router.post('/transactions/restore', requireAdmin, transactionController.restoreTransaction);
 
 // Dashboard & Analytics
 router.get('/dashboard/summary', requireAdmin, dashboardController.getDashboardSummary);
@@ -68,5 +72,9 @@ router.get('/reports/export/csv', requireAdmin, reportController.exportReportCSV
 
 // Audit Logs
 router.get('/audit-logs', requireAdmin, auditController.getAuditLogs);
+
+// Attachments / Receipts (Streamed directly from PostgreSQL bytes)
+router.get('/attachments/:id/view', attachmentController.getAttachment);
+router.get('/attachments/:id/download', attachmentController.downloadAttachment);
 
 export default router;

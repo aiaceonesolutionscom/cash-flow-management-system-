@@ -94,6 +94,112 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
 
     res.json({ success: true, admin });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to retrieve profile' });
+    console.error('Get me error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch admin profile' });
+  }
+};
+
+export const updateProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.admin?.id) {
+      res.status(401).json({ success: false, message: 'Not authenticated' });
+      return;
+    }
+
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      res.status(400).json({ success: false, message: 'Name is required' });
+      return;
+    }
+
+    const updated = await prisma.admin.update({
+      where: { id: req.admin.id },
+      data: { name: name.trim() },
+      select: { id: true, email: true, name: true, createdAt: true }
+    });
+
+    await createAuditLog({
+      action: AuditAction.UPDATE,
+      entity: 'ADMIN_PROFILE',
+      entityId: updated.id,
+      details: { message: 'Admin profile name updated', name: updated.name },
+      ipAddress: req.ip
+    });
+
+    res.json({ success: true, message: 'Profile updated successfully', admin: updated });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update profile' });
+  }
+};
+
+export const changePassword = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.admin?.id) {
+      res.status(401).json({ success: false, message: 'Not authenticated' });
+      return;
+    }
+
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      res.status(400).json({ success: false, message: 'All password fields are required' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      res.status(400).json({ success: false, message: 'New password and confirmation do not match' });
+      return;
+    }
+
+    // Strong password validation rules
+    const hasMinLength = newPassword.length >= 8;
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasLower = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword);
+
+    if (!hasMinLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
+      res.status(400).json({
+        success: false,
+        message: 'Weak password rejected. Password must be at least 8 characters and include uppercase, lowercase, numbers, and special characters.'
+      });
+      return;
+    }
+
+    const admin = await prisma.admin.findUnique({
+      where: { id: req.admin.id }
+    });
+
+    if (!admin) {
+      res.status(404).json({ success: false, message: 'Admin not found' });
+      return;
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, admin.passwordHash);
+    if (!isMatch) {
+      res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      return;
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.admin.update({
+      where: { id: admin.id },
+      data: { passwordHash: newHash }
+    });
+
+    await createAuditLog({
+      action: AuditAction.UPDATE,
+      entity: 'ADMIN_SECURITY',
+      entityId: admin.id,
+      details: { message: 'Admin password successfully changed' },
+      ipAddress: req.ip
+    });
+
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ success: false, message: 'Failed to change password' });
   }
 };

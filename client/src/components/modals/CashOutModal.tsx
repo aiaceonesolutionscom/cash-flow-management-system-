@@ -157,14 +157,16 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Payment Account *</label>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Payment Method / Account *</label>
               <select
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 font-semibold"
               >
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name} ({a.type})</option>
+                  <option key={a.id} value={a.id}>
+                    {a.type === 'CASH' ? '💵 Cash' : a.type === 'BANK' ? '🏦 Bank' : '📱 Wallet'}
+                  </option>
                 ))}
               </select>
             </div>

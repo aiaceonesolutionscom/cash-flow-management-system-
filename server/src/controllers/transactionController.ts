@@ -1,12 +1,14 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { TransactionType } from '@prisma/client';
+import { Decimal } from 'decimal.js';
 
 export const getTransactions = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       companyId,
       accountId,
+      accountType,
       categoryId,
       type,
       startDate,
@@ -26,8 +28,24 @@ export const getTransactions = async (req: Request, res: Response): Promise<void
     if (accountId && accountId !== 'all') {
       where.accountId = accountId as string;
     }
+    if (accountType && accountType !== 'all') {
+      where.account = { type: accountType };
+    }
     if (categoryId && categoryId !== 'all') {
-      where.categoryId = categoryId as string;
+      if (!companyId || companyId === 'all') {
+        const cat = await prisma.category.findUnique({ where: { id: categoryId as string } });
+        if (cat) {
+          const siblingCats = await prisma.category.findMany({
+            where: { name: cat.name },
+            select: { id: true }
+          });
+          where.categoryId = { in: siblingCats.map(c => c.id) };
+        } else {
+          where.categoryId = categoryId as string;
+        }
+      } else {
+        where.categoryId = categoryId as string;
+      }
     }
     if (type && (type === 'CASH_IN' || type === 'CASH_OUT')) {
       where.type = type as TransactionType;
@@ -88,5 +106,62 @@ export const getTransactions = async (req: Request, res: Response): Promise<void
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch transaction ledger' });
+  }
+};
+
+export const restoreTransaction = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, companyId, accountId, categoryId, type, amount, party, paymentDate, referenceNo, description } = req.body;
+
+    if (!companyId || !accountId || !categoryId || !type || !amount || !party) {
+      res.status(400).json({ success: false, message: 'Incomplete transaction snapshot for restore' });
+      return;
+    }
+
+    const amountDec = new Decimal(amount);
+
+    const restored = await prisma.$transaction(async (tx) => {
+      // 1. Create transaction back
+      const created = await tx.transaction.create({
+        data: {
+          id: id || undefined,
+          companyId,
+          accountId,
+          categoryId,
+          type: type as TransactionType,
+          amount: amountDec,
+          party,
+          paymentDate: new Date(paymentDate || new Date()),
+          referenceNo: referenceNo || null,
+          description: description || null
+        },
+        include: {
+          company: true,
+          account: true,
+          category: true,
+          attachments: true
+        }
+      });
+
+      // 2. Readjust account balance
+      if (type === TransactionType.CASH_IN) {
+        await tx.account.update({
+          where: { id: accountId },
+          data: { currentBalance: { increment: amountDec } }
+        });
+      } else {
+        await tx.account.update({
+          where: { id: accountId },
+          data: { currentBalance: { decrement: amountDec } }
+        });
+      }
+
+      return created;
+    });
+
+    res.json({ success: true, message: 'Transaction restored successfully', transaction: restored });
+  } catch (error: any) {
+    console.error('Error restoring transaction:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to restore transaction' });
   }
 };

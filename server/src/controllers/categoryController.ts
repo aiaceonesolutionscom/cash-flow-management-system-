@@ -35,6 +35,30 @@ export const getCategories = async (req: Request, res: Response): Promise<void> 
       ]
     });
 
+    // When "All Companies" is selected, deduplicate by category name and type
+    // so common categories like "Office Rent" or "Salaries" appear EXACTLY ONCE!
+    if (!companyId || companyId === 'all') {
+      const uniqueMap = new Map<string, any>();
+      for (const cat of categories) {
+        const key = `${cat.name.trim().toLowerCase()}_${cat.type}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, {
+            ...cat,
+            company: null,
+            _count: {
+              transactions: cat._count?.transactions || 0
+            }
+          });
+        } else {
+          // Combine transaction counts across all companies
+          const existing = uniqueMap.get(key);
+          existing._count.transactions += (cat._count?.transactions || 0);
+        }
+      }
+      res.json({ success: true, categories: Array.from(uniqueMap.values()) });
+      return;
+    }
+
     res.json({ success: true, categories });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch categories' });
