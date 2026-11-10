@@ -67,14 +67,6 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Mobile Brand Name */}
-          <div className="flex items-center space-x-2 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 shadow-2xs flex items-center justify-center p-0.5 shrink-0">
-              <img src="/logos/app-logo.png" alt="Logo" className="w-full h-full object-contain" />
-            </div>
-            <span className="font-bold text-slate-900 text-sm tracking-tight hidden xs:inline">CASHFLOW</span>
-          </div>
-
           {/* Desktop Filter Dropdowns (Inline on Desktop >= md) */}
           <div className="hidden md:flex items-center space-x-2.5">
             {/* Company Filter Dropdown */}

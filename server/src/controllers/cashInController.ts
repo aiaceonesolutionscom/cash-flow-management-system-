@@ -7,9 +7,9 @@ import { createAuditLog } from '../utils/audit';
 
 export const createCashIn = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { companyId, accountId, categoryId, amount, party, paymentDate, referenceNo, description } = req.body;
+    const { companyId, accountId, categoryId, categoryName, amount, party, paymentDate, referenceNo, description } = req.body;
 
-    if (!companyId || !accountId || !categoryId || !amount || !party || !paymentDate) {
+    if (!companyId || !accountId || (!categoryId && !categoryName) || !amount || !party || !paymentDate) {
       res.status(400).json({ success: false, message: 'All required fields must be provided' });
       return;
     }
@@ -21,7 +21,39 @@ export const createCashIn = async (req: Request, res: Response): Promise<void> =
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Verify account belongs to company
+      // 1. Resolve category: search or auto-create to prevent duplicates
+      let targetCategoryId = categoryId;
+      if (categoryName && categoryName.trim()) {
+        const trimmedCat = categoryName.trim();
+        const existingCat = await tx.category.findFirst({
+          where: {
+            name: { equals: trimmedCat, mode: 'insensitive' },
+            type: 'INCOME',
+            OR: [
+              { companyId },
+              { companyId: null }
+            ]
+          }
+        });
+        if (existingCat) {
+          targetCategoryId = existingCat.id;
+        } else {
+          const newCat = await tx.category.create({
+            data: {
+              name: trimmedCat,
+              type: 'INCOME',
+              companyId
+            }
+          });
+          targetCategoryId = newCat.id;
+        }
+      }
+
+      if (!targetCategoryId) {
+        throw new Error('Valid income category is required');
+      }
+
+      // 2. Verify account belongs to company
       const account = await tx.account.findFirst({
         where: { id: accountId, companyId }
       });
@@ -29,12 +61,12 @@ export const createCashIn = async (req: Request, res: Response): Promise<void> =
         throw new Error('Selected account does not belong to the selected company');
       }
 
-      // 2. Create transaction record
+      // 3. Create transaction record
       const transaction = await tx.transaction.create({
         data: {
           companyId,
           accountId,
-          categoryId,
+          categoryId: targetCategoryId,
           type: TransactionType.CASH_IN,
           amount: amountDec,
           party: party.trim(),

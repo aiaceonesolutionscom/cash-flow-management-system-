@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, ArrowDownRight, Upload, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, ArrowDownRight, Upload, Loader2, ChevronDown, Check } from 'lucide-react';
 import { api } from '../../services/api';
 import { Company, Account, Category } from '../../types';
 
@@ -23,6 +23,10 @@ export const CashInModal: React.FC<CashInModalProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [accountId, setAccountId] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string>('');
+  const [categoryInput, setCategoryInput] = useState<string>('');
+  const [isCatDropdownOpen, setIsCatDropdownOpen] = useState<boolean>(false);
+  const catDropdownRef = useRef<HTMLDivElement>(null);
+
   const [amount, setAmount] = useState<string>('');
   const [party, setParty] = useState<string>('');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -42,8 +46,20 @@ export const CashInModal: React.FC<CashInModalProps> = ({
       setDescription('');
       setReceiptFile(null);
       setError('');
+      setIsCatDropdownOpen(false);
     }
   }, [isOpen, initialCompanyId, companies]);
+
+  // Close category dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (catDropdownRef.current && !catDropdownRef.current.contains(e.target as Node)) {
+        setIsCatDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!companyId) return;
@@ -64,6 +80,10 @@ export const CashInModal: React.FC<CashInModalProps> = ({
           setCategories(catRes.data.categories);
           if (catRes.data.categories.length > 0) {
             setCategoryId(catRes.data.categories[0].id);
+            setCategoryInput(catRes.data.categories[0].name);
+          } else {
+            setCategoryId('');
+            setCategoryInput('');
           }
         }
       } catch (err) {
@@ -75,11 +95,43 @@ export const CashInModal: React.FC<CashInModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleCategoryInputChange = (val: string) => {
+    setCategoryInput(val);
+    setIsCatDropdownOpen(true);
+    // Check if matches existing category exactly (case-insensitive)
+    const exactMatch = categories.find((c) => c.name.toLowerCase() === val.trim().toLowerCase());
+    if (exactMatch) {
+      setCategoryId(exactMatch.id);
+    } else {
+      setCategoryId('');
+    }
+  };
+
+  const selectExistingCategory = (cat: Category) => {
+    setCategoryId(cat.id);
+    setCategoryInput(cat.name);
+    setIsCatDropdownOpen(false);
+  };
+
+  const selectNewCategory = () => {
+    setCategoryId('');
+    setIsCatDropdownOpen(false);
+  };
+
+  const filteredCategories = categories.filter((c) =>
+    c.name.toLowerCase().includes(categoryInput.toLowerCase())
+  );
+
+  const hasExactMatch = categories.some(
+    (c) => c.name.toLowerCase() === categoryInput.trim().toLowerCase()
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!companyId || !accountId || !categoryId || !amount || !party || !paymentDate) {
+    const finalCatName = categoryInput.trim();
+    if (!companyId || !accountId || (!categoryId && !finalCatName) || !amount || !party || !paymentDate) {
       setError('Please fill in all mandatory fields.');
       return;
     }
@@ -94,7 +146,13 @@ export const CashInModal: React.FC<CashInModalProps> = ({
       const formData = new FormData();
       formData.append('companyId', companyId);
       formData.append('accountId', accountId);
-      formData.append('categoryId', categoryId);
+
+      if (categoryId) {
+        formData.append('categoryId', categoryId);
+      } else {
+        formData.append('categoryName', finalCatName);
+      }
+
       formData.append('amount', amount);
       formData.append('party', party);
       formData.append('paymentDate', paymentDate);
@@ -201,17 +259,77 @@ export const CashInModal: React.FC<CashInModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Income Category *</label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
+            {/* Searchable & Creatable Income Category Combobox */}
+            <div className="relative" ref={catDropdownRef}>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Income Category *</label>
+                {categoryInput.trim() && !hasExactMatch && (
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
+                    + Auto-creates as Income
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={categoryInput}
+                  onChange={(e) => handleCategoryInputChange(e.target.value)}
+                  onFocus={() => setIsCatDropdownOpen(true)}
+                  placeholder="Type to search or add new category..."
+                  className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsCatDropdownOpen((prev) => !prev)}
+                  className="absolute right-2 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Suggestions / Create Dropdown Menu */}
+              {isCatDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto p-1 divide-y divide-slate-50 animate-in fade-in-50 duration-150">
+                  {/* Option to create brand new if typed text doesn't exactly match */}
+                  {categoryInput.trim() && !hasExactMatch && (
+                    <button
+                      type="button"
+                      onClick={selectNewCategory}
+                      className="w-full text-left px-3 py-2 rounded-lg bg-emerald-50/80 hover:bg-emerald-100/90 text-emerald-800 text-xs font-bold flex items-center justify-between transition-colors mb-1 cursor-pointer"
+                    >
+                      <span className="truncate">Add new "{categoryInput.trim()}"</span>
+                      <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full shrink-0 ml-2">
+                        + New Income Category
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Filtered Existing Categories */}
+                  {filteredCategories.length > 0 ? (
+                    filteredCategories.map((cat) => {
+                      const isSelected = categoryId === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => selectExistingCategory(cat)}
+                          className={`w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-500 text-white font-semibold'
+                              : 'text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="truncate">{cat.name}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
+                        </button>
+                      );
+                    })
+                  ) : !categoryInput.trim() ? (
+                    <div className="px-3 py-2 text-xs text-slate-400 text-center">Type any category name to create or search...</div>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             <div>
