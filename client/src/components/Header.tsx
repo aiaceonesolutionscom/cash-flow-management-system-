@@ -109,25 +109,6 @@ export const Header: React.FC<HeaderProps> = ({
               </select>
               <ChevronDown className="w-3 h-3 absolute right-2 pointer-events-none text-slate-400" />
             </div>
-
-            {/* Desktop Custom Date Pickers */}
-            {showCustomDate && (
-              <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-lg p-1">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="text-xs bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:ring-1 focus:ring-blue-500"
-                />
-                <span className="text-[11px] text-slate-400 font-medium">to</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="text-xs bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-700 focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-            )}
           </div>
         </div>
 
@@ -192,6 +173,48 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
+      {/* Universal Custom Date Strip (Active when Custom Range is selected - never overlaps buttons!) */}
+      {showCustomDate && (
+        <div className="border-t border-slate-200/80 bg-slate-50/95 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center space-x-2 text-xs text-slate-700 font-semibold">
+            <Calendar className="w-4 h-4 text-blue-600" />
+            <span>Custom Date Range:</span>
+          </div>
+
+          <div className="flex items-center space-x-2 flex-wrap">
+            <div className="flex items-center space-x-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 shadow-2xs">
+              <span className="text-[10px] text-slate-400 font-bold uppercase">From</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="text-xs bg-transparent border-0 text-slate-800 focus:ring-0 p-0 cursor-pointer"
+              />
+            </div>
+            <span className="text-xs text-slate-400 font-bold">→</span>
+            <div className="flex items-center space-x-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 shadow-2xs">
+              <span className="text-[10px] text-slate-400 font-bold uppercase">To</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="text-xs bg-transparent border-0 text-slate-800 focus:ring-0 p-0 cursor-pointer"
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                type="button"
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 rounded hover:bg-rose-50 transition-colors ml-1 cursor-pointer"
+                title="Clear Custom Dates"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Mobile Sub-Header Filter Bar (Always visible on mobile < md screens so nothing is hidden or overlapped!) */}
       <div className="md:hidden border-t border-slate-100 bg-slate-50/90 px-3 py-2 space-y-2">
         <div className="grid grid-cols-2 gap-2">
@@ -236,31 +259,6 @@ export const Header: React.FC<HeaderProps> = ({
             <ChevronDown className="w-3 h-3 absolute right-2 pointer-events-none text-slate-400" />
           </div>
         </div>
-
-        {/* Mobile Custom Date Pickers (Dedicated full row when Custom Range is active) */}
-        {showCustomDate && (
-          <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg p-2 animate-in fade-in duration-200">
-            <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">From</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-800"
-              />
-            </div>
-            <span className="text-xs text-slate-400 self-end mb-1.5 font-bold">→</span>
-            <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">To</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-800"
-              />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Logout Confirmation Dialog */}
