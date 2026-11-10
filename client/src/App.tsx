@@ -26,6 +26,9 @@ const MainLayout: React.FC = () => {
   // Mobile menu drawer state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
+  // Desktop sidebar collapse state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+
   // Quick Action Modal states
   const [isCashInOpen, setIsCashInOpen] = useState<boolean>(false);
   const [isCashOutOpen, setIsCashOutOpen] = useState<boolean>(false);
@@ -81,6 +84,8 @@ const MainLayout: React.FC = () => {
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
