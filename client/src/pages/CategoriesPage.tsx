@@ -3,6 +3,7 @@ import { Tag, Plus, Trash2, Loader2, RefreshCw, X } from 'lucide-react';
 import { api } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Category, CategoryType, Company } from '../types';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
 
 export const CategoriesPage: React.FC = () => {
   const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName, companies } = useFilters();
@@ -17,7 +18,9 @@ export const CategoriesPage: React.FC = () => {
   const [companyId, setCompanyId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
   const fetchCategories = async () => {
     try {
@@ -76,26 +79,27 @@ export const CategoriesPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (cat: Category) => {
+  const handleDeleteClick = (cat: Category) => {
     if (cat._count && cat._count.transactions > 0) {
-      alert(`Cannot delete category "${cat.name}" because it is currently linked to ${cat._count.transactions} transaction(s).`);
+      setWarningMessage(`Cannot delete category "${cat.name}" because it is currently linked to ${cat._count.transactions} transaction(s). Please reassign or delete those transactions first.`);
       return;
     }
+    setDeleteTarget(cat);
+  };
 
-    if (!window.confirm(`Are you sure you want to delete category "${cat.name}"?`)) {
-      return;
-    }
-
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      setDeletingId(cat.id);
-      const res = await api.delete(`/categories/${cat.id}`);
+      setIsDeleting(true);
+      const res = await api.delete(`/categories/${deleteTarget.id}`);
       if (res.data.success) {
+        setDeleteTarget(null);
         triggerRefresh();
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to delete category');
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -204,12 +208,11 @@ export const CategoriesPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-center">
                       <button
-                        onClick={() => handleDelete(cat)}
-                        disabled={deletingId === cat.id}
-                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        onClick={() => handleDeleteClick(cat)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
                       >
-                        {deletingId === cat.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
@@ -309,6 +312,30 @@ export const CategoriesPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Confirmation Dialog for Category Deletion */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete Category"
+        message={`Are you sure you want to delete the category "${deleteTarget?.name}" (${deleteTarget?.type})?\n\nThis category will be permanently removed.`}
+        confirmText="Delete Category"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      {/* Warning Dialog for Linked Transactions */}
+      <ConfirmDialog
+        isOpen={!!warningMessage}
+        title="Cannot Delete Category"
+        message={warningMessage || ''}
+        confirmText="Understood"
+        cancelText="Close"
+        variant="warning"
+        onConfirm={() => setWarningMessage(null)}
+        onCancel={() => setWarningMessage(null)}
+      />
     </div>
   );
 };

@@ -1,20 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { Search, ReceiptText, Loader2, RefreshCw, Paperclip, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ReceiptText, Loader2, RefreshCw, Paperclip, Trash2 } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Account, Category } from '../types';
 import { format } from 'date-fns';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { Pagination } from '../components/common/Pagination';
 
 export const TransactionsPage: React.FC = () => {
-  const { selectedCompanyId, refreshTrigger, activeCompanyName } = useFilters();
+  const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [totalCashIn, setTotalCashIn] = useState<string>('0.00');
   const [totalCashOut, setTotalCashOut] = useState<string>('0.00');
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [limit] = useState<number>(25);
+  const [limit, setLimit] = useState<number>(25);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: string; party: string; amount: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -67,9 +71,26 @@ export const TransactionsPage: React.FC = () => {
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setIsDeleting(true);
+      const endpoint = deleteTarget.type === 'CASH_IN' ? `/cash-in/${deleteTarget.id}` : `/cash-out/${deleteTarget.id}`;
+      const res = await api.delete(endpoint);
+      if (res.data.success) {
+        setDeleteTarget(null);
+        triggerRefresh();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete record');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   useEffect(() => {
     fetchTransactions();
-  }, [selectedCompanyId, page, typeFilter, accountFilter, categoryFilter, refreshTrigger]);
+  }, [selectedCompanyId, page, limit, typeFilter, accountFilter, categoryFilter, refreshTrigger]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,6 +219,7 @@ export const TransactionsPage: React.FC = () => {
                   <th className="py-3 px-4">Reference</th>
                   <th className="py-3 px-4 text-right">Amount (PKR)</th>
                   <th className="py-3 px-4 text-center">Receipt</th>
+                  <th className="py-3 px-4 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -249,6 +271,20 @@ export const TransactionsPage: React.FC = () => {
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => setDeleteTarget({
+                          id: tx.id,
+                          type: tx.type,
+                          party: tx.party || 'Transaction',
+                          amount: String(tx.amount)
+                        })}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Delete Transaction"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -256,31 +292,33 @@ export const TransactionsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Pagination Bar */}
-        {totalPages > 1 && (
-          <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
-            <div>
-              Showing Page <span className="font-semibold text-slate-800">{page}</span> of <span className="font-semibold text-slate-800">{totalPages}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                disabled={page <= 1}
-                className="px-2.5 py-1 border border-slate-200 rounded bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                disabled={page >= totalPages}
-                className="px-2.5 py-1 border border-slate-200 rounded bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Unified Pagination Bar */}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          itemsPerPage={limit}
+          onPageChange={(p) => setPage(p)}
+          onItemsPerPageChange={(l) => {
+            setLimit(l);
+            setPage(1);
+          }}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete Transaction"
+        message={`Are you sure you want to delete this ${deleteTarget?.type === 'CASH_IN' ? 'Cash In' : 'Cash Out'} record for "${deleteTarget?.party}" amounting to PKR ${formatPKR(deleteTarget?.amount || '0')}?\n\nThe account balance will be reversed and restored accordingly.`}
+        confirmText="Delete Record"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

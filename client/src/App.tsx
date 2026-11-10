@@ -7,7 +7,6 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CashInPage } from './pages/CashInPage';
 import { CashOutPage } from './pages/CashOutPage';
-import { TransfersPage } from './pages/TransfersPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
@@ -16,7 +15,6 @@ import { ReportsPage } from './pages/ReportsPage';
 // Quick Action Modals
 import { CashInModal } from './components/modals/CashInModal';
 import { CashOutModal } from './components/modals/CashOutModal';
-import { TransferModal } from './components/modals/TransferModal';
 
 const MainLayout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -32,7 +30,6 @@ const MainLayout: React.FC = () => {
   // Quick Action Modal states
   const [isCashInOpen, setIsCashInOpen] = useState<boolean>(false);
   const [isCashOutOpen, setIsCashOutOpen] = useState<boolean>(false);
-  const [isTransferOpen, setIsTransferOpen] = useState<boolean>(false);
 
   React.useEffect(() => {
     if (window.location.pathname !== '/') {
@@ -63,8 +60,6 @@ const MainLayout: React.FC = () => {
         return <CashInPage onOpenCreate={() => setIsCashInOpen(true)} />;
       case 'cash-out':
         return <CashOutPage onOpenCreate={() => setIsCashOutOpen(true)} />;
-      case 'transfers':
-        return <TransfersPage onOpenCreate={() => setIsTransferOpen(true)} />;
       case 'transactions':
         return <TransactionsPage />;
       case 'companies':
@@ -95,7 +90,6 @@ const MainLayout: React.FC = () => {
         <Header
           onOpenCashIn={() => setIsCashInOpen(true)}
           onOpenCashOut={() => setIsCashOutOpen(true)}
-          onOpenTransfer={() => setIsTransferOpen(true)}
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
 
@@ -116,14 +110,6 @@ const MainLayout: React.FC = () => {
       <CashOutModal
         isOpen={isCashOutOpen}
         onClose={() => setIsCashOutOpen(false)}
-        onSuccess={triggerRefresh}
-        companies={companies}
-        initialCompanyId={selectedCompanyId}
-      />
-
-      <TransferModal
-        isOpen={isTransferOpen}
-        onClose={() => setIsTransferOpen(false)}
         onSuccess={triggerRefresh}
         companies={companies}
         initialCompanyId={selectedCompanyId}

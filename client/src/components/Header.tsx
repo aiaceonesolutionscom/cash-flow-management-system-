@@ -4,7 +4,6 @@ import {
   Calendar,
   Plus,
   Minus,
-  ArrowRightLeft,
   LogOut,
   UserCheck,
   ChevronDown,
@@ -12,18 +11,18 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useFilters } from '../context/FilterContext';
+import { ConfirmDialog } from './common/ConfirmDialog';
 
 interface HeaderProps {
   onOpenCashIn: () => void;
   onOpenCashOut: () => void;
-  onOpenTransfer: () => void;
+  onOpenTransfer?: () => void;
   onToggleMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenCashIn,
   onOpenCashOut,
-  onOpenTransfer,
   onToggleMobileMenu
 }) => {
   const { admin, logout } = useAuth();
@@ -40,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   } = useFilters();
 
   const [showCustomDate, setShowCustomDate] = useState<boolean>(dateRange === 'custom');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
 
   const handleDateRangeChange = (val: string) => {
     setDateRange(val);
@@ -144,16 +144,6 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden sm:inline">Cash </span>Out
         </button>
 
-        {/* Quick Action: Transfer */}
-        <button
-          onClick={onOpenTransfer}
-          className="hidden md:inline-flex items-center px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors shrink-0"
-          title="Transfer Between Accounts"
-        >
-          <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
-          Transfer
-        </button>
-
         <div className="h-5 w-px bg-slate-200 mx-0.5 sm:mx-1 hidden xs:block" />
 
         {/* Admin Badge */}
@@ -169,13 +159,28 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Logout Button */}
         <button
-          onClick={logout}
+          onClick={() => setShowLogoutConfirm(true)}
           title="Logout"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
         >
           <LogOut className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        title="Sign Out Confirmation"
+        message="Are you sure you want to log out of your Admin session? You will need to enter your password again to access the system."
+        confirmText="Yes, Log Out"
+        cancelText="Stay Signed In"
+        variant="warning"
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          logout();
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </header>
   );
 };

@@ -4,6 +4,8 @@ import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transfer } from '../types';
 import { format } from 'date-fns';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { Pagination } from '../components/common/Pagination';
 
 interface TransfersPageProps {
   onOpenCreate: () => void;
@@ -16,20 +18,27 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ onOpenCreate }) =>
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(10);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; amount: string; from: string; to: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const fetchTransfers = async () => {
     try {
       setIsLoading(true);
       const params: any = {
         companyId: selectedCompanyId,
-        search: searchTerm || undefined
+        search: searchTerm || undefined,
+        page,
+        limit
       };
       const res = await api.get('/transfers', { params });
       if (res.data.success) {
         setTransfers(res.data.transfers);
         setTotalAmount(res.data.meta.totalAmount);
         setTotalCount(res.data.meta.totalCount);
+        setTotalPages(res.data.meta.totalPages || 1);
       }
     } catch (err) {
       console.error('Failed to load transfers', err);
@@ -40,28 +49,27 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ onOpenCreate }) =>
 
   useEffect(() => {
     fetchTransfers();
-  }, [selectedCompanyId, refreshTrigger]);
+  }, [selectedCompanyId, page, limit, refreshTrigger]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setPage(1);
     fetchTransfers();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to reverse and delete this transfer? The amount will be transferred back to the source account.')) {
-      return;
-    }
-
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      setDeletingId(id);
-      const res = await api.delete(`/transfers/${id}`);
+      setIsDeleting(true);
+      const res = await api.delete(`/transfers/${deleteTarget.id}`);
       if (res.data.success) {
+        setDeleteTarget(null);
         triggerRefresh();
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to reverse transfer');
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -186,12 +194,16 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ onOpenCreate }) =>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <button
-                        onClick={() => handleDelete(tr.id)}
-                        disabled={deletingId === tr.id}
-                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        onClick={() => setDeleteTarget({
+                          id: tr.id,
+                          amount: String(tr.amount),
+                          from: tr.fromAccount.name,
+                          to: tr.toAccount.name
+                        })}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title="Reverse & Delete Transfer"
                       >
-                        {deletingId === tr.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
@@ -200,7 +212,33 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ onOpenCreate }) =>
             </table>
           </div>
         )}
+
+        {/* Pagination Bar */}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          itemsPerPage={limit}
+          onPageChange={(p) => setPage(p)}
+          onItemsPerPageChange={(l) => {
+            setLimit(l);
+            setPage(1);
+          }}
+        />
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Reverse & Delete Transfer"
+        message={`Are you sure you want to reverse this transfer of PKR ${formatPKR(deleteTarget?.amount || '0')} from "${deleteTarget?.from}" to "${deleteTarget?.to}"?\n\nThe amount will be transferred back to the source account and reversed in the ledger.`}
+        confirmText="Reverse Transfer"
+        cancelText="Cancel"
+        variant="warning"
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

@@ -3,13 +3,11 @@ import {
   LayoutDashboard,
   ArrowDownRight,
   ArrowUpRight,
-  ArrowRightLeft,
   ReceiptText,
   Building2,
   Tag,
   BarChart3,
-  Menu,
-  ChevronRight
+  Menu
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -33,7 +31,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', label: 'Main Dashboard', icon: LayoutDashboard },
     { id: 'cash-in', label: 'Cash In (Income)', icon: ArrowDownRight },
     { id: 'cash-out', label: 'Cash Out (Expenses)', icon: ArrowUpRight },
-    { id: 'transfers', label: 'Money Transfers', icon: ArrowRightLeft },
     { id: 'transactions', label: 'Transaction Ledger', icon: ReceiptText },
     { id: 'companies', label: 'Company Overview', icon: Building2 },
     { id: 'categories', label: 'Expense Categories', icon: Tag },
@@ -54,36 +51,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex flex-col h-full bg-white select-none">
         {/* Brand Header */}
         {collapsed ? (
-          /* COLLAPSED STATE (Screenshot 2 & 3) */
-          <div className="py-3 px-2 border-b border-slate-200 bg-white flex flex-col items-center gap-2.5 shrink-0">
-            {/* Top C Logo (Screenshot 3) */}
-            <div
-              onClick={onToggleCollapse}
-              className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center p-1 shrink-0 cursor-pointer hover:border-blue-300 transition-all"
-              title="Click to Expand Sidebar"
-            >
-              <img
-                src="/logos/app-logo.png"
-                alt="App Logo"
-                className="w-full h-full object-contain"
-              />
-            </div>
-
-            {/* Teer (Arrow >) Expand Button (Screenshot 2) */}
+          /* COLLAPSED STATE: Logo with auto-hover-to-hamburger (yahan to tumne sahi laga diya) */
+          <div className="h-16 flex items-center justify-center px-2 border-b border-slate-200 bg-white shrink-0">
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-md shadow-blue-500/25 flex items-center justify-center transition-all cursor-pointer group shrink-0"
-              title="Expand Sidebar"
+              className="relative group w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center overflow-hidden transition-all duration-200 hover:border-blue-400 hover:shadow-md cursor-pointer shrink-0"
+              title="Click to Expand Sidebar"
             >
-              <ChevronRight className="w-5 h-5 text-white stroke-[2.8] transition-transform group-hover:translate-x-0.5" />
+              {/* App Logo - Hides when mouse hovers */}
+              <img
+                src="/logos/app-logo.png"
+                alt="App Logo"
+                className="w-full h-full object-contain p-1 transition-opacity duration-200 group-hover:opacity-0"
+              />
+
+              {/* Hamburger Icon - Shows when mouse hovers */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-blue-50/95 text-blue-600 transition-all duration-200">
+                <Menu className="w-5 h-5 stroke-[2.2]" />
+              </div>
             </button>
           </div>
         ) : (
-          /* EXPANDED STATE */
+          /* EXPANDED STATE (andar): Normal logo on left, and Hamburger button on right to close/collapse */
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 bg-white shrink-0">
-            {/* Left: Brand Logo & Title */}
-            <div className="flex items-center space-x-2.5 truncate min-w-0">
+            {/* Left: Normal App Logo & Brand Title (stays visible, doesn't hide) */}
+            <div className="flex items-center space-x-2.5 min-w-0 truncate">
               <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center p-1 shrink-0">
                 <img
                   src="/logos/app-logo.png"
@@ -97,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
-            {/* Right: Hamburger button to collapse/close (replaces the cross button) */}
+            {/* Right: Hamburger button to collapse/close the sidebar (yeh idhar laga dena andar) */}
             <button
               type="button"
               onClick={isMobile ? onCloseMobile : onToggleCollapse}

@@ -4,6 +4,8 @@ import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Account } from '../types';
 import { format } from 'date-fns';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { Pagination } from '../components/common/Pagination';
 
 interface CashInPageProps {
   onOpenCreate: () => void;
@@ -18,7 +20,11 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [accountFilter, setAccountFilter] = useState<string>('all');
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(10);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; party: string; amount: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -42,13 +48,16 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
       const params: any = {
         companyId: selectedCompanyId,
         search: searchTerm || undefined,
-        accountId: accountFilter !== 'all' ? accountFilter : undefined
+        accountId: accountFilter !== 'all' ? accountFilter : undefined,
+        page,
+        limit
       };
       const res = await api.get('/cash-in', { params });
       if (res.data.success) {
         setTransactions(res.data.transactions);
         setTotalAmount(res.data.meta.totalAmount);
         setTotalCount(res.data.meta.totalCount);
+        setTotalPages(res.data.meta.totalPages || 1);
       }
     } catch (err) {
       console.error('Failed to load Cash In records', err);
@@ -59,28 +68,27 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
 
   useEffect(() => {
     fetchCashIn();
-  }, [selectedCompanyId, accountFilter, refreshTrigger]);
+  }, [selectedCompanyId, accountFilter, page, limit, refreshTrigger]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setPage(1);
     fetchCashIn();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this Cash In record? The account balance will be automatically reversed.')) {
-      return;
-    }
-
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      setDeletingId(id);
-      const res = await api.delete(`/cash-in/${id}`);
+      setIsDeleting(true);
+      const res = await api.delete(`/cash-in/${deleteTarget.id}`);
       if (res.data.success) {
+        setDeleteTarget(null);
         triggerRefresh();
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to delete record');
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -231,12 +239,11 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
                     </td>
                     <td className="py-3 px-4 text-center">
                       <button
-                        onClick={() => handleDelete(tx.id)}
-                        disabled={deletingId === tx.id}
-                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        onClick={() => setDeleteTarget({ id: tx.id, party: tx.party || 'Record', amount: String(tx.amount) })}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title="Delete Cash In"
                       >
-                        {deletingId === tx.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
@@ -245,7 +252,33 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
             </table>
           </div>
         )}
+
+        {/* Pagination Bar */}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          itemsPerPage={limit}
+          onPageChange={(p) => setPage(p)}
+          onItemsPerPageChange={(l) => {
+            setLimit(l);
+            setPage(1);
+          }}
+        />
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete Cash In Record"
+        message={`Are you sure you want to delete this Cash In record from "${deleteTarget?.party}" for PKR ${formatPKR(deleteTarget?.amount || '0')}?\n\nThe account balance will be automatically reversed and restored.`}
+        confirmText="Delete Record"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };
