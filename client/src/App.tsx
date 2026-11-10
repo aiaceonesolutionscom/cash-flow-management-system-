@@ -9,13 +9,11 @@ import { CashInPage } from './pages/CashInPage';
 import { CashOutPage } from './pages/CashOutPage';
 import { TransfersPage } from './pages/TransfersPage';
 import { TransactionsPage } from './pages/TransactionsPage';
-import { AccountsPage } from './pages/AccountsPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ReportsPage } from './pages/ReportsPage';
-import { AuditLogsPage } from './pages/AuditLogsPage';
 
-// Modals
+// Quick Action Modals
 import { CashInModal } from './components/modals/CashInModal';
 import { CashOutModal } from './components/modals/CashOutModal';
 import { TransferModal } from './components/modals/TransferModal';
@@ -24,6 +22,9 @@ const MainLayout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { companies, selectedCompanyId, triggerRefresh } = useFilters();
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
+
+  // Mobile menu drawer state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // Quick Action Modal states
   const [isCashInOpen, setIsCashInOpen] = useState<boolean>(false);
@@ -57,16 +58,12 @@ const MainLayout: React.FC = () => {
         return <TransfersPage onOpenCreate={() => setIsTransferOpen(true)} />;
       case 'transactions':
         return <TransactionsPage />;
-      case 'accounts':
-        return <AccountsPage />;
       case 'companies':
         return <CompaniesPage />;
       case 'categories':
         return <CategoriesPage />;
       case 'reports':
         return <ReportsPage />;
-      case 'audit-logs':
-        return <AuditLogsPage />;
       default:
         return <DashboardPage />;
     }
@@ -74,8 +71,13 @@ const MainLayout: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans antialiased text-slate-800">
-      {/* Sidebar Navigation */}
-      <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} />
+      {/* Sidebar Navigation (with Desktop and Mobile Drawer modes) */}
+      <Sidebar
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -83,6 +85,7 @@ const MainLayout: React.FC = () => {
           onOpenCashIn={() => setIsCashInOpen(true)}
           onOpenCashOut={() => setIsCashOutOpen(true)}
           onOpenTransfer={() => setIsTransferOpen(true)}
+          onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
 
         <main className="flex-1 overflow-y-auto">

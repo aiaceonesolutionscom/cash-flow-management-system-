@@ -25,11 +25,10 @@ export const ReportsPage: React.FC = () => {
     { id: 'income', label: '2. Income / Inflows Report' },
     { id: 'expense', label: '3. Operating Expense Report' },
     { id: 'company_wise', label: '4. Company-Wise Comparison' },
-    { id: 'account_wise', label: '5. Account Reconciliation' },
-    { id: 'category_wise', label: '6. Category Breakdown' },
-    { id: 'monthly', label: '7. Monthly Financial Report' },
-    { id: 'yearly', label: '8. Yearly Trend Report' },
-    { id: 'transactions', label: '9. Detailed Transaction Ledger' },
+    { id: 'category_wise', label: '5. Category Breakdown' },
+    { id: 'monthly', label: '6. Monthly Financial Report' },
+    { id: 'yearly', label: '7. Yearly Trend Report' },
+    { id: 'transactions', label: '8. Detailed Transaction Ledger' },
   ];
 
   const fetchReport = async () => {
@@ -69,7 +68,7 @@ export const ReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 sm:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
