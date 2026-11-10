@@ -9,8 +9,7 @@ import {
   Tag,
   BarChart3,
   Menu,
-  ChevronRight,
-  X
+  ChevronRight
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -81,43 +80,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         ) : (
-          /* EXPANDED STATE (Screenshot 1) */
+          /* EXPANDED STATE */
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 bg-white shrink-0">
-            <div className="flex items-center space-x-3 min-w-0">
-              {/* Hamburger Button (Screenshot 1) */}
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                className="w-10 h-10 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 flex items-center justify-center hover:bg-blue-100 hover:border-blue-300 active:scale-95 transition-all cursor-pointer shadow-2xs shrink-0"
-                title="Collapse Sidebar"
-              >
-                <Menu className="w-5 h-5 stroke-[2.2]" />
-              </button>
-
-              {/* Logo + Brand Name */}
-              <div className="flex items-center space-x-2.5 truncate">
+            {/* Left: Brand Logo & Title */}
+            <div className="flex items-center space-x-2.5 truncate min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center p-1 shrink-0">
                 <img
                   src="/logos/app-logo.png"
                   alt="App Logo"
-                  className="w-8 h-8 rounded-lg object-contain border border-slate-100 shrink-0"
+                  className="w-full h-full object-contain"
                 />
-                <div className="truncate">
-                  <h1 className="font-bold text-slate-900 text-sm leading-tight tracking-tight">CASHFLOW</h1>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Financial Suite</p>
-                </div>
+              </div>
+              <div className="truncate">
+                <h1 className="font-bold text-slate-900 text-sm leading-tight tracking-tight">CASHFLOW</h1>
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Financial Suite</p>
               </div>
             </div>
 
-            {/* Mobile Close Button */}
-            {isMobile && onCloseMobile && (
-              <button
-                onClick={onCloseMobile}
-                className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                aria-label="Close menu"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
+            {/* Right: Hamburger button to collapse/close (replaces the cross button) */}
+            <button
+              type="button"
+              onClick={isMobile ? onCloseMobile : onToggleCollapse}
+              className="w-9 h-9 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 flex items-center justify-center hover:bg-blue-100 hover:border-blue-300 active:scale-95 transition-all cursor-pointer shadow-2xs shrink-0 ml-2"
+              title={isMobile ? "Close Menu" : "Collapse Sidebar"}
+            >
+              <Menu className="w-4.5 h-4.5 stroke-[2.2]" />
+            </button>
           </div>
         )}
 
