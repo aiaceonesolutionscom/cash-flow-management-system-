@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Building, Loader2, ArrowRight } from 'lucide-react';
+import { Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
@@ -27,24 +27,51 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25">
-            <Building className="w-6 h-6" />
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+      {/* Logos & Header Section */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        {/* 3 Logos in Row: Left = Tech Academy | Center = Krunch | Right = Global Sourcing */}
+        <div className="flex items-center justify-center gap-3 sm:gap-5 mb-5">
+          {/* Left: Global Tech Academy */}
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-xs border border-slate-200 p-2 flex items-center justify-center overflow-hidden hover:shadow-md transition-shadow">
+            <img
+              src="/logos/global-tech-academy.png"
+              alt="Global Tech Academy"
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+
+          {/* Center: Krunch 360 */}
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-xs border border-slate-200 p-2 flex items-center justify-center overflow-hidden hover:shadow-md transition-shadow ring-2 ring-blue-500/10">
+            <img
+              src="/logos/krunch.jpeg"
+              alt="Krunch 360"
+              className="max-h-full max-w-full object-contain rounded-xl"
+            />
+          </div>
+
+          {/* Right: Global Sourcing International */}
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-xs border border-slate-200 p-2 flex items-center justify-center overflow-hidden hover:shadow-md transition-shadow">
+            <img
+              src="/logos/global-sourcing.png"
+              alt="Global Sourcing International"
+              className="max-h-full max-w-full object-contain"
+            />
           </div>
         </div>
-        <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-slate-900">
+
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
           Expense & Cash Flow Management
         </h2>
-        <p className="mt-1 text-center text-xs text-slate-500 font-medium">
-          Centralized Financial Management for 3 Companies
+        <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
+          Centralized Financial Management System
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-2xl sm:px-10">
-          <form className="space-y-5" onSubmit={handleSubmit}>
+      {/* Login Card */}
+      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-6 sm:px-8 shadow-sm border border-slate-200 rounded-2xl">
+          <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
             {error && (
               <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
                 {error}
@@ -89,7 +116,7 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className="pt-1">
               <button
                 type="submit"
                 disabled={isLoading}
@@ -102,31 +129,13 @@ export const LoginPage: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    Sign In to Central Dashboard
+                    Sign In to Dashboard
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </>
                 )}
               </button>
             </div>
           </form>
-
-          {/* Companies Managed Pill */}
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">
-              Active Connected Companies
-            </div>
-            <div className="flex flex-wrap gap-1.5 justify-center">
-              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium">
-                Global Tech International
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium">
-                Krunch 360
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium">
-                Global Sourcing International
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

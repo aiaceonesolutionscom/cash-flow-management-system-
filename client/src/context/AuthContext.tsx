@@ -20,9 +20,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [admin, setAdmin] = useState<Admin | null>(() => {
     const saved = localStorage.getItem('cashflow_admin');
-    return saved ? JSON.parse(saved) : null;
+    const token = localStorage.getItem('cashflow_token');
+    return (saved && token) ? JSON.parse(saved) : null;
   });
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    return !!localStorage.getItem('cashflow_token');
+  });
 
   useEffect(() => {
     const verifyAuth = async () => {
@@ -37,6 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.data.success) {
           setAdmin(res.data.admin);
           localStorage.setItem('cashflow_admin', JSON.stringify(res.data.admin));
+        } else {
+          setAdmin(null);
+          localStorage.removeItem('cashflow_token');
+          localStorage.removeItem('cashflow_admin');
         }
       } catch {
         localStorage.removeItem('cashflow_token');
@@ -73,7 +80,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('cashflow_token');
       localStorage.removeItem('cashflow_admin');
       setAdmin(null);
-      window.location.href = '/login';
     }
   };
 

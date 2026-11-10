@@ -3,6 +3,7 @@ import axios from 'axios';
 export const api = axios.create({
   baseURL: '/api',
   withCredentials: true,
+  timeout: 5000,
 });
 
 api.interceptors.request.use((config) => {
@@ -19,9 +20,6 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('cashflow_token');
       localStorage.removeItem('cashflow_admin');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
     }
     return Promise.reject(error);
   }
