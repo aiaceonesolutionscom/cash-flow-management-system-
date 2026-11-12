@@ -150,6 +150,11 @@ export const ReportsPage: React.FC = () => {
     if (txTypeFilter !== 'all') params.append('type', txTypeFilter);
     if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
+    const token = localStorage.getItem('cashflow_token');
+    if (token) {
+      params.append('token', token);
+    }
+
     const exportUrl = `/api/reports/export/${formatType}?${params.toString()}`;
     window.open(exportUrl, '_blank');
     setTimeout(() => setIsExporting(null), 1500);
