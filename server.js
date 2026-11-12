@@ -12,6 +12,10 @@
 const path = require('path');
 const http = require('http');
 
+// Force Prisma to use binary engine to prevent Tokio timer panic in LiteSpeed / CloudLinux LVE
+process.env.PRISMA_CLIENT_ENGINE_TYPE = 'binary';
+process.env.PRISMA_CLI_QUERY_ENGINE_TYPE = 'binary';
+
 // Ensure Node looks in server/node_modules as well
 const serverNodeModules = path.resolve(__dirname, 'server/node_modules');
 if (module.paths) {
