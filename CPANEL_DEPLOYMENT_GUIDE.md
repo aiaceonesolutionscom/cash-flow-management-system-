@@ -99,13 +99,13 @@ npm install --prefix client
 
 # 3. Push Database Schema to PostgreSQL & Seed Initial Data
 cd server
-npx prisma generate
-npx prisma db push
-npm run prisma:seed
+./node_modules/.bin/prisma generate
+./node_modules/.bin/prisma db push
+node dist/prisma/seed.js
 cd ..
 
-# 4. Build both Backend and Frontend for Production
-npm run build
+# 4. Trigger Instant Restart
+mkdir -p tmp && touch tmp/restart.txt
 ```
 
 ---
