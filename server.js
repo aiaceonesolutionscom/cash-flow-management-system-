@@ -12,9 +12,23 @@
 const path = require('path');
 const http = require('http');
 
+// Ensure Node looks in server/node_modules as well
+const serverNodeModules = path.resolve(__dirname, 'server/node_modules');
+if (module.paths) {
+  module.paths.unshift(serverNodeModules);
+}
+if (require('module').globalPaths) {
+  require('module').globalPaths.unshift(serverNodeModules);
+}
+
 // Load environment variables from root or server directory
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
-require('dotenv').config({ path: path.resolve(__dirname, 'server/.env') });
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+} catch (_) {
+  try {
+    require(path.join(serverNodeModules, 'dotenv')).config({ path: path.resolve(__dirname, '.env') });
+  } catch (e) {}
+}
 
 // LiteSpeed Node.js Selector Socket Patch
 // On LiteSpeed servers, traffic is piped via a Unix Domain Socket instead of a TCP port.
