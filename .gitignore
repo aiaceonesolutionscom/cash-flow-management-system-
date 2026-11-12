@@ -1,5 +1,5 @@
 node_modules/
-dist/
+# dist folders are included for zero-overhead production deployment
 build/
 .env
 uploads/
