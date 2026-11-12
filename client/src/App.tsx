@@ -109,6 +109,7 @@ const MainLayout: React.FC = () => {
         <Header
           onOpenCashIn={() => setIsCashInOpen(true)}
           onOpenCashOut={() => setIsCashOutOpen(true)}
+          onOpenTransfer={() => setIsTransferOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />

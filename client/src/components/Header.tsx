@@ -4,6 +4,7 @@ import {
   Calendar,
   Plus,
   Minus,
+  ArrowRightLeft,
   LogOut,
   UserCheck,
   ChevronDown,
@@ -25,6 +26,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenCashIn,
   onOpenCashOut,
+  onOpenTransfer,
   onOpenSettings,
   onToggleMobileMenu
 }) => {
@@ -133,6 +135,18 @@ export const Header: React.FC<HeaderProps> = ({
             <Minus className="w-3.5 h-3.5 sm:mr-1" />
             <span><span className="hidden sm:inline">Cash </span>Out</span>
           </button>
+
+          {/* Quick Action: Transfer Funds Between Accounts */}
+          {onOpenTransfer && (
+            <button
+              onClick={onOpenTransfer}
+              className="inline-flex items-center px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer active:scale-95"
+              title="Transfer Funds Between Accounts (e.g. Bank to Cash)"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Transfer</span>
+            </button>
+          )}
 
           <div className="h-5 w-px bg-slate-200 mx-0.5 sm:mx-1" />
 
