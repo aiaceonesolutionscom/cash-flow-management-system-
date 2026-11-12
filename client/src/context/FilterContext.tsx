@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { Company } from '../types';
+import { useAuth } from './AuthContext';
 
 interface FilterContextType {
   selectedCompanyId: string;
@@ -20,6 +21,7 @@ interface FilterContextType {
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 export const FilterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('this_month');
   const [startDate, setStartDate] = useState<string>('');
@@ -30,7 +32,7 @@ export const FilterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const fetchCompanies = async () => {
     try {
       const res = await api.get('/companies');
-      if (res.data.success) {
+      if (res.data.success && res.data.companies) {
         setCompanies(res.data.companies);
       }
     } catch (e) {
@@ -39,11 +41,12 @@ export const FilterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('cashflow_token');
-    if (token) {
+    if (isAuthenticated || localStorage.getItem('cashflow_token')) {
       fetchCompanies();
+    } else {
+      setCompanies([]);
     }
-  }, [refreshTrigger]);
+  }, [isAuthenticated, refreshTrigger]);
 
   const triggerRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
