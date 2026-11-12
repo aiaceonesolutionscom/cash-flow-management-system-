@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, ReceiptText, Loader2, RefreshCw, Paperclip, Trash2, Calendar } from 'lucide-react';
+import { Search, ReceiptText, Loader2, RefreshCw, Paperclip, Trash2, Calendar, Printer } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Category } from '../types';
@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { Pagination } from '../components/common/Pagination';
 import { ReceiptModal } from '../components/common/ReceiptModal';
 import { UndoToast } from '../components/common/UndoToast';
+import { PaymentVoucherModal } from '../components/common/PaymentVoucherModal';
 
 export const TransactionsPage: React.FC = () => {
   const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
@@ -30,6 +31,7 @@ export const TransactionsPage: React.FC = () => {
     amount: string;
     party: string;
   } | null>(null);
+  const [activeVoucher, setActiveVoucher] = useState<Transaction | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -329,6 +331,14 @@ export const TransactionsPage: React.FC = () => {
                       )}
 
                       <button
+                        onClick={() => setActiveVoucher(tx)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                        title="Print Payment Voucher"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+
+                      <button
                         onClick={() => setDeleteTarget({
                           id: tx.id,
                           type: tx.type,
@@ -431,18 +441,27 @@ export const TransactionsPage: React.FC = () => {
                         )}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => setDeleteTarget({
-                            id: tx.id,
-                            type: tx.type,
-                            party: tx.party || 'Transaction',
-                            amount: String(tx.amount)
-                          })}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Delete Transaction"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => setActiveVoucher(tx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                            title="Print Payment Voucher"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget({
+                              id: tx.id,
+                              type: tx.type,
+                              party: tx.party || 'Transaction',
+                              amount: String(tx.amount)
+                            })}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete Transaction"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -490,6 +509,13 @@ export const TransactionsPage: React.FC = () => {
         title={activeReceipt?.title}
         amount={activeReceipt?.amount}
         party={activeReceipt?.party}
+      />
+
+      {/* Printable Payment Voucher Modal */}
+      <PaymentVoucherModal
+        isOpen={!!activeVoucher}
+        onClose={() => setActiveVoucher(null)}
+        transaction={activeVoucher}
       />
 
       {/* Floating Undo Toast */}

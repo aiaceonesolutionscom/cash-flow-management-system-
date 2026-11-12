@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlusCircle, Search, Trash2, ArrowUpRight, Paperclip, Loader2, RefreshCw, Calendar } from 'lucide-react';
+import { PlusCircle, Search, Trash2, ArrowUpRight, Paperclip, Loader2, RefreshCw, Calendar, Printer } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Category } from '../types';
@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { Pagination } from '../components/common/Pagination';
 import { ReceiptModal } from '../components/common/ReceiptModal';
 import { UndoToast } from '../components/common/UndoToast';
+import { PaymentVoucherModal } from '../components/common/PaymentVoucherModal';
 
 interface CashOutPageProps {
   onOpenCreate: () => void;
@@ -37,6 +38,7 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
     amount: string;
     party: string;
   } | null>(null);
+  const [activeVoucher, setActiveVoucher] = useState<Transaction | null>(null);
 
   useEffect(() => {
     const fetchDropdowns = async () => {
@@ -316,6 +318,14 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
                       )}
 
                       <button
+                        onClick={() => setActiveVoucher(tx)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                        title="Print Payment Voucher"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+
+                      <button
                         onClick={() => setDeleteTarget({
                           id: tx.id,
                           party: tx.party || 'Vendor',
@@ -406,18 +416,27 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
                         )}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => setDeleteTarget({
-                            id: tx.id,
-                            party: tx.party || 'Vendor',
-                            amount: String(tx.amount),
-                            category: tx.category.name
-                          })}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Delete Cash Out"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => setActiveVoucher(tx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Print Payment Voucher"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget({
+                              id: tx.id,
+                              party: tx.party || 'Vendor',
+                              amount: String(tx.amount),
+                              category: tx.category.name
+                            })}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete Cash Out"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -464,6 +483,13 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
         title={activeReceipt?.title}
         amount={activeReceipt?.amount}
         party={activeReceipt?.party}
+      />
+
+      {/* Printable Payment Voucher Modal */}
+      <PaymentVoucherModal
+        isOpen={!!activeVoucher}
+        onClose={() => setActiveVoucher(null)}
+        transaction={activeVoucher}
       />
 
       {/* Floating Undo Toast */}
