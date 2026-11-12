@@ -4,6 +4,10 @@
   "private": true,
   "description": "Production-quality Expense & Cash Flow Management System for 3 Companies in PKR",
   "main": "server.js",
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
     "start": "node server.js",
     "build": "npm run build --prefix server && npm run build --prefix client",
