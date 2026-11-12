@@ -65,6 +65,7 @@ router.delete('/transfers/:id', requireAdmin, transferController.deleteTransfer)
 // Centralized Transactions Ledger
 router.get('/transactions', requireAdmin, transactionController.getTransactions);
 router.post('/transactions/restore', requireAdmin, transactionController.restoreTransaction);
+router.post('/transactions/bulk-import', requireAdmin, transactionController.bulkImportTransactions);
 
 // Dashboard & Analytics
 router.get('/dashboard/summary', requireAdmin, dashboardController.getDashboardSummary);

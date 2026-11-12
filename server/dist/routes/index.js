@@ -89,6 +89,7 @@ router.delete('/transfers/:id', auth_1.requireAdmin, transferController.deleteTr
 // Centralized Transactions Ledger
 router.get('/transactions', auth_1.requireAdmin, transactionController.getTransactions);
 router.post('/transactions/restore', auth_1.requireAdmin, transactionController.restoreTransaction);
+router.post('/transactions/bulk-import', auth_1.requireAdmin, transactionController.bulkImportTransactions);
 // Dashboard & Analytics
 router.get('/dashboard/summary', auth_1.requireAdmin, dashboardController.getDashboardSummary);
 // Financial Reports & Exports

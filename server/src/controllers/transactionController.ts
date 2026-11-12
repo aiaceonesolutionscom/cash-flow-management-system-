@@ -165,3 +165,74 @@ export const restoreTransaction = async (req: Request, res: Response): Promise<v
     res.status(500).json({ success: false, message: error.message || 'Failed to restore transaction' });
   }
 };
+
+export const bulkImportTransactions = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ success: false, message: 'Items array is required and must not be empty' });
+      return;
+    }
+
+    if (items.length > 500) {
+      res.status(400).json({ success: false, message: 'Maximum 500 records can be imported per batch' });
+      return;
+    }
+
+    let importedCount = 0;
+
+    await prisma.$transaction(async (tx) => {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!item.companyId || !item.accountId || !item.categoryId || !item.type || !item.amount || !item.party) {
+          throw new Error(`Row ${i + 1}: Missing required fields (company, account, category, type, amount, party)`);
+        }
+
+        const amtNum = Number(item.amount);
+        if (isNaN(amtNum) || amtNum <= 0) {
+          throw new Error(`Row ${i + 1}: Invalid amount "${item.amount}"`);
+        }
+
+        const txType = item.type === 'CASH_IN' ? TransactionType.CASH_IN : TransactionType.CASH_OUT;
+        const amtDec = new Decimal(amtNum);
+
+        await tx.transaction.create({
+          data: {
+            companyId: item.companyId,
+            accountId: item.accountId,
+            categoryId: item.categoryId,
+            type: txType,
+            amount: amtDec,
+            party: String(item.party).trim(),
+            paymentDate: new Date(item.paymentDate || new Date()),
+            referenceNo: item.referenceNo ? String(item.referenceNo).trim() : null,
+            description: item.description ? String(item.description).trim() : null
+          }
+        });
+
+        if (txType === TransactionType.CASH_IN) {
+          await tx.account.update({
+            where: { id: item.accountId },
+            data: { currentBalance: { increment: amtDec } }
+          });
+        } else {
+          await tx.account.update({
+            where: { id: item.accountId },
+            data: { currentBalance: { decrement: amtDec } }
+          });
+        }
+
+        importedCount++;
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully imported ${importedCount} transactions.`,
+      importedCount
+    });
+  } catch (error: any) {
+    console.error('Error in bulk import:', error);
+    res.status(400).json({ success: false, message: error.message || 'Failed to bulk import transactions' });
+  }
+};

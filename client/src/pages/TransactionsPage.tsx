@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, ReceiptText, Loader2, RefreshCw, Paperclip, Trash2, Calendar, Printer } from 'lucide-react';
+import { Search, ReceiptText, Loader2, RefreshCw, Paperclip, Trash2, Calendar, Printer, Upload } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Category } from '../types';
@@ -9,9 +9,10 @@ import { Pagination } from '../components/common/Pagination';
 import { ReceiptModal } from '../components/common/ReceiptModal';
 import { UndoToast } from '../components/common/UndoToast';
 import { PaymentVoucherModal } from '../components/common/PaymentVoucherModal';
+import { BulkImportModal } from '../components/modals/BulkImportModal';
 
 export const TransactionsPage: React.FC = () => {
-  const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
+  const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName, companies } = useFilters();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [totalCashIn, setTotalCashIn] = useState<string>('0.00');
@@ -32,6 +33,7 @@ export const TransactionsPage: React.FC = () => {
     party: string;
   } | null>(null);
   const [activeVoucher, setActiveVoucher] = useState<Transaction | null>(null);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState<boolean>(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -165,14 +167,25 @@ export const TransactionsPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={fetchTransactions}
-          className="p-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs self-start sm:self-auto flex items-center space-x-1.5"
-          title="Refresh Ledger"
-        >
-          <RefreshCw className="w-4 h-4" />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <button
+            onClick={() => setIsBulkImportOpen(true)}
+            className="inline-flex items-center space-x-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            title="Import Transactions from CSV"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Bulk Import CSV</span>
+          </button>
+
+          <button
+            onClick={fetchTransactions}
+            className="p-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs flex items-center space-x-1.5 cursor-pointer"
+            title="Refresh Ledger"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary KPI Strip */}
@@ -516,6 +529,18 @@ export const TransactionsPage: React.FC = () => {
         isOpen={!!activeVoucher}
         onClose={() => setActiveVoucher(null)}
         transaction={activeVoucher}
+      />
+
+      {/* Bulk CSV Transaction Import Modal */}
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        onSuccess={() => {
+          fetchTransactions();
+          triggerRefresh();
+        }}
+        companies={companies}
+        initialCompanyId={selectedCompanyId}
       />
 
       {/* Floating Undo Toast */}
