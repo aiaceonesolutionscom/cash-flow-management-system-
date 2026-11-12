@@ -9,7 +9,9 @@ import {
   BarChart3,
   Menu,
   Settings,
-  StickyNote
+  StickyNote,
+  ArrowRightLeft,
+  ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -34,10 +36,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'cash-in', label: 'Cash In', icon: ArrowDownRight },
     { id: 'cash-out', label: 'Cash Out', icon: ArrowUpRight },
     { id: 'transactions', label: 'Transactions', icon: ReceiptText },
+    { id: 'transfers', label: 'Transfers', icon: ArrowRightLeft },
     { id: 'notes', label: 'Company Notes', icon: StickyNote },
     { id: 'companies', label: 'Companies', icon: Building2 },
     { id: 'categories', label: 'Categories', icon: Tag },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
+    { id: 'audit-logs', label: 'Audit Logs', icon: ShieldCheck },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

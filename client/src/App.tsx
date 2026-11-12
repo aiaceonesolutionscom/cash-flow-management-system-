@@ -12,10 +12,13 @@ import { CompaniesPage } from './pages/CompaniesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { CompanyNotesPage } from './pages/CompanyNotesPage';
+import { TransfersPage } from './pages/TransfersPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 
 // Quick Action Modals
 import { CashInModal } from './components/modals/CashInModal';
 import { CashOutModal } from './components/modals/CashOutModal';
+import { TransferModal } from './components/modals/TransferModal';
 import { SettingsModal } from './components/common/SettingsModal';
 
 const MainLayout: React.FC = () => {
@@ -32,6 +35,7 @@ const MainLayout: React.FC = () => {
   // Quick Action Modal states
   const [isCashInOpen, setIsCashInOpen] = useState<boolean>(false);
   const [isCashOutOpen, setIsCashOutOpen] = useState<boolean>(false);
+  const [isTransferOpen, setIsTransferOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   React.useEffect(() => {
@@ -65,6 +69,8 @@ const MainLayout: React.FC = () => {
         return <CashOutPage onOpenCreate={() => setIsCashOutOpen(true)} />;
       case 'transactions':
         return <TransactionsPage />;
+      case 'transfers':
+        return <TransfersPage onOpenCreate={() => setIsTransferOpen(true)} />;
       case 'notes':
         return <CompanyNotesPage />;
       case 'companies':
@@ -73,6 +79,8 @@ const MainLayout: React.FC = () => {
         return <CategoriesPage />;
       case 'reports':
         return <ReportsPage />;
+      case 'audit-logs':
+        return <AuditLogsPage />;
       default:
         return <DashboardPage />;
     }
@@ -122,6 +130,14 @@ const MainLayout: React.FC = () => {
       <CashOutModal
         isOpen={isCashOutOpen}
         onClose={() => setIsCashOutOpen(false)}
+        onSuccess={triggerRefresh}
+        companies={companies}
+        initialCompanyId={selectedCompanyId}
+      />
+
+      <TransferModal
+        isOpen={isTransferOpen}
+        onClose={() => setIsTransferOpen(false)}
         onSuccess={triggerRefresh}
         companies={companies}
         initialCompanyId={selectedCompanyId}
