@@ -18,6 +18,11 @@ export function requireAdmin(req: AuthenticatedRequest, res: Response, next: Nex
       token = req.headers.authorization.split(' ')[1];
     }
 
+    // Support query parameter token for direct media preview & PDF viewing
+    if (!token && typeof req.query.token === 'string' && req.query.token.trim()) {
+      token = req.query.token.trim();
+    }
+
     if (!token) {
       res.status(401).json({ success: false, message: 'Authentication required. No session found.' });
       return;

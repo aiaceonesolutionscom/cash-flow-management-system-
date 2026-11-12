@@ -8,7 +8,8 @@ import {
   Tag,
   BarChart3,
   Menu,
-  Settings
+  Settings,
+  StickyNote
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,14 +30,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile
 }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Main Dashboard', icon: LayoutDashboard },
-    { id: 'cash-in', label: 'Cash In (Income)', icon: ArrowDownRight },
-    { id: 'cash-out', label: 'Cash Out (Expenses)', icon: ArrowUpRight },
-    { id: 'transactions', label: 'Transaction Ledger', icon: ReceiptText },
-    { id: 'companies', label: 'Company Overview', icon: Building2 },
-    { id: 'categories', label: 'Expense Categories', icon: Tag },
-    { id: 'reports', label: 'Financial Reports', icon: BarChart3 },
-    { id: 'settings', label: 'Profile & Settings', icon: Settings },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'cash-in', label: 'Cash In', icon: ArrowDownRight },
+    { id: 'cash-out', label: 'Cash Out', icon: ArrowUpRight },
+    { id: 'transactions', label: 'Transactions', icon: ReceiptText },
+    { id: 'notes', label: 'Company Notes', icon: StickyNote },
+    { id: 'companies', label: 'Companies', icon: Building2 },
+    { id: 'categories', label: 'Categories', icon: Tag },
+    { id: 'reports', label: 'Reports', icon: BarChart3 },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   const handleTabClick = (tabId: string) => {

@@ -24,6 +24,7 @@ const DEFAULT_EXPENSE_CATEGORIES = [
 ];
 
 const DEFAULT_INCOME_CATEGORIES = [
+  'Company Funds',
   'Client Invoice / Sales',
   'Consulting Services',
   'Retainer Fee',

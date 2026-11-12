@@ -31,6 +31,20 @@ enum AuditAction {
   BALANCE_ADJUST
 }
 
+enum DemandPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum DemandStatus {
+  PENDING
+  IN_PROGRESS
+  FULFILLED
+  CANCELLED
+}
+
 model Admin {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -52,6 +66,7 @@ model Company {
   categories   Category[]
   transactions Transaction[]
   transfers    Transfer[]
+  notes        CompanyNote[]
 
   @@map("companies")
 }
@@ -172,3 +187,38 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+model CompanyNote {
+  id             String            @id @default(uuid())
+  companyId      String            @map("company_id")
+  title          String
+  totalAmount    Decimal           @map("total_amount") @db.Decimal(15, 2)
+  dueDate        DateTime?         @map("due_date")
+  priority       DemandPriority    @default(HIGH)
+  status         DemandStatus      @default(PENDING)
+  notes          String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  company        Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items          CompanyNoteItem[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("company_notes")
+}
+
+model CompanyNoteItem {
+  id        String      @id @default(uuid())
+  noteId    String      @map("note_id")
+  itemName  String      @map("item_name")
+  amount    Decimal     @db.Decimal(15, 2)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  note      CompanyNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId])
+  @@map("company_note_items")
+}
+

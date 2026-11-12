@@ -187,6 +187,49 @@ export const getDashboardSummary = async (req: Request, res: Response): Promise<
       take: 8
     });
 
+    // 7. Company Funds Injected (Category: "Company Funds")
+    const fundsInjectedAgg = await prisma.transaction.aggregate({
+      where: {
+        ...whereTx,
+        type: TransactionType.CASH_IN,
+        category: {
+          name: { contains: 'Fund', mode: 'insensitive' }
+        }
+      },
+      _sum: { amount: true }
+    });
+    const totalFundsInjected = Number(fundsInjectedAgg._sum.amount?.toString() || 0);
+
+    // 8. Active Company Requirements / Notes
+    const whereNotes: any = {
+      status: { in: ['PENDING', 'IN_PROGRESS'] }
+    };
+    if (companyId && companyId !== 'all') {
+      whereNotes.companyId = companyId as string;
+    }
+
+    const activeNotes = await prisma.companyNote.findMany({
+      where: whereNotes,
+      include: {
+        company: { select: { id: true, name: true, code: true } },
+        items: true
+      },
+      orderBy: [
+        { priority: 'asc' },
+        { dueDate: 'asc' },
+        { createdAt: 'desc' }
+      ],
+      take: 5
+    });
+
+    const activeNotesAgg = await prisma.companyNote.aggregate({
+      where: whereNotes,
+      _sum: { totalAmount: true },
+      _count: { id: true }
+    });
+    const totalRequirementsPending = Number(activeNotesAgg._sum.totalAmount?.toString() || 0);
+    const activeRequirementsCount = activeNotesAgg._count.id || 0;
+
     res.json({
       success: true,
       cards: {
@@ -197,14 +240,18 @@ export const getDashboardSummary = async (req: Request, res: Response): Promise<
         totalAvailableBalance,
         cashAccountBalance: cashBalance.toFixed(2),
         bankAccountBalance: bankBalance.toFixed(2),
-        walletAccountBalance: walletBalance.toFixed(2)
+        walletAccountBalance: walletBalance.toFixed(2),
+        totalFundsInjected,
+        totalRequirementsPending,
+        activeRequirementsCount
       },
       charts: {
         monthlyComparison,
         categoryBreakdown,
         companyComparison
       },
-      recentTransactions
+      recentTransactions,
+      activeNotes
     });
   } catch (error) {
     console.error('Error fetching dashboard summary:', error);

@@ -97,6 +97,46 @@ export interface DashboardCards {
   cashAccountBalance: string;
   bankAccountBalance: string;
   walletAccountBalance: string;
+  totalFundsInjected?: number;
+  totalRequirementsPending?: number;
+  activeRequirementsCount?: number;
+}
+
+export type DemandPriority = 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type DemandStatus = 'PENDING' | 'IN_PROGRESS' | 'FULFILLED' | 'CANCELLED';
+
+export interface CompanyNoteItem {
+  id?: string;
+  noteId?: string;
+  itemName: string;
+  amount: number | string;
+  createdAt?: string;
+}
+
+export interface CompanyNote {
+  id: string;
+  companyId: string;
+  title: string;
+  totalAmount: number | string;
+  dueDate?: string | null;
+  priority: DemandPriority;
+  status: DemandStatus;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  company: { id: string; name: string; code: string };
+  items: CompanyNoteItem[];
+}
+
+export interface CompanyNotesSummary {
+  grandTotalPending: number;
+  companyBreakdowns: {
+    companyId: string;
+    companyName: string;
+    companyCode: string;
+    pendingTotal: number;
+  }[];
+  counts: Record<string, { count: number; total: number }>;
 }
 
 export interface DashboardData {
@@ -107,4 +147,5 @@ export interface DashboardData {
     companyComparison: { companyId: string; name: string; code: string; cashIn: number; cashOut: number; net: number; balance: number }[];
   };
   recentTransactions: Transaction[];
+  activeNotes?: CompanyNote[];
 }

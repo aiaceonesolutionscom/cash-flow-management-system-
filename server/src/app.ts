@@ -3,14 +3,27 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fs from 'fs';
 import routes from './routes';
 
 export const createApp = () => {
   const app = express();
 
-  // Security Middleware
+  // Hide technology fingerprinting
+  app.disable('x-powered-by');
+
+  // OWASP ASVS V3 & V13 Security Headers
   app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false, // Allows bundled SPA assets and styles
+    frameguard: { action: "deny" },
+    noSniff: true,
+    xssFilter: true,
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    }
   }));
 
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -20,12 +33,9 @@ export const createApp = () => {
   }));
 
   app.use(cookieParser());
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-
-  // Static uploads directory for receipts
-  const uploadDir = path.join(process.cwd(), 'uploads');
-  app.use('/uploads', express.static(uploadDir));
+  // Prevent DoS via oversized payload
+  app.use(express.json({ limit: '2mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
   // Mount API Routes
   app.use('/api', routes);
@@ -34,6 +44,24 @@ export const createApp = () => {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  // Serve Frontend Single-Page App (SPA) in Production / cPanel
+  const clientDistPaths = [
+    path.resolve(__dirname, '../../client/dist'),
+    path.resolve(process.cwd(), 'client/dist'),
+    path.resolve(__dirname, '../client/dist'),
+  ];
+  const staticPath = clientDistPaths.find((p) => fs.existsSync(p));
+
+  if (staticPath) {
+    app.use(express.static(staticPath));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+        return next();
+      }
+      res.sendFile(path.join(staticPath, 'index.html'));
+    });
+  }
 
   // Global Error Handler
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

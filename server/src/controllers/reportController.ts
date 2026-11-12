@@ -56,8 +56,89 @@ async function buildReportWhere(query: any) {
 
 export const getFinancialReport = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { reportType = 'cash_flow', companyId } = req.query;
+    const { reportType = 'cash_flow', companyId, status, priority } = req.query;
+
+    // 1. DEDICATED REPORT: Company Requirements / Demands Notes
+    if (reportType === 'company_requirements') {
+      const noteWhere: any = {};
+      if (companyId && companyId !== 'all') {
+        noteWhere.companyId = companyId as string;
+      }
+      if (status && status !== 'all') {
+        noteWhere.status = status;
+      }
+      if (priority && priority !== 'all') {
+        noteWhere.priority = priority;
+      }
+
+      const notes = await prisma.companyNote.findMany({
+        where: noteWhere,
+        include: {
+          company: { select: { id: true, name: true, code: true } },
+          items: { orderBy: { createdAt: 'asc' } }
+        },
+        orderBy: [
+          { status: 'asc' },
+          { dueDate: 'asc' },
+          { createdAt: 'desc' }
+        ]
+      });
+
+      let grandTotal = 0;
+      let pendingTotal = 0;
+      let fulfilledTotal = 0;
+      const companyMap = new Map<string, { companyName: string; total: number; pending: number; count: number }>();
+
+      notes.forEach((n) => {
+        const amt = Number(n.totalAmount) || 0;
+        grandTotal += amt;
+        if (n.status === 'PENDING' || n.status === 'IN_PROGRESS') {
+          pendingTotal += amt;
+        } else if (n.status === 'FULFILLED') {
+          fulfilledTotal += amt;
+        }
+
+        const compEntry = companyMap.get(n.companyId) || {
+          companyName: n.company.name,
+          total: 0,
+          pending: 0,
+          count: 0
+        };
+        compEntry.total += amt;
+        if (n.status === 'PENDING' || n.status === 'IN_PROGRESS') {
+          compEntry.pending += amt;
+        }
+        compEntry.count += 1;
+        companyMap.set(n.companyId, compEntry);
+      });
+
+      res.json({
+        success: true,
+        reportType: 'company_requirements',
+        grandTotal: grandTotal.toFixed(2),
+        pendingTotal: pendingTotal.toFixed(2),
+        fulfilledTotal: fulfilledTotal.toFixed(2),
+        totalCount: notes.length,
+        companySummaries: Array.from(companyMap.values()).map((c) => ({
+          companyName: c.companyName,
+          total: c.total.toFixed(2),
+          pending: c.pending.toFixed(2),
+          count: c.count
+        })),
+        notes
+      });
+      return;
+    }
+
+    // 2. DEDICATED REPORT: Company Funds Statement
+    const isFundsReport = reportType === 'company_funds';
     const where = await buildReportWhere(req.query);
+    if (isFundsReport) {
+      where.type = TransactionType.CASH_IN;
+      where.category = {
+        name: { contains: 'Fund', mode: 'insensitive' }
+      };
+    }
 
     const transactions = await prisma.transaction.findMany({
       where,
@@ -156,7 +237,101 @@ export const getFinancialReport = async (req: Request, res: Response): Promise<v
 
 export const exportReportExcel = async (req: Request, res: Response): Promise<void> => {
   try {
+    const { reportType, companyId, status, priority } = req.query;
+
+    // Excel Export for Company Requirements / Demands
+    if (reportType === 'company_requirements') {
+      const noteWhere: any = {};
+      if (companyId && companyId !== 'all') noteWhere.companyId = companyId as string;
+      if (status && status !== 'all') noteWhere.status = status;
+      if (priority && priority !== 'all') noteWhere.priority = priority;
+
+      const notes = await prisma.companyNote.findMany({
+        where: noteWhere,
+        include: {
+          company: true,
+          items: { orderBy: { createdAt: 'asc' } }
+        },
+        orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }]
+      });
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'CASHFLOW Financial Management System';
+      workbook.created = new Date();
+
+      const sheet = workbook.addWorksheet('Company Requirements');
+      sheet.columns = [
+        { header: 'Created Date', key: 'date', width: 14 },
+        { header: 'Company', key: 'company', width: 28 },
+        { header: 'Requirement / Purpose', key: 'title', width: 26 },
+        { header: 'Line Items Breakdown', key: 'items', width: 45 },
+        { header: 'Priority', key: 'priority', width: 14 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Due Date', key: 'dueDate', width: 14 },
+        { header: 'Total Amount (PKR)', key: 'amount', width: 22 }
+      ];
+
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1E40AF' }
+      };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      headerRow.height = 26;
+
+      let grandTotal = 0;
+      let pendingTotal = 0;
+
+      notes.forEach((n) => {
+        const amt = Number(n.totalAmount);
+        grandTotal += amt;
+        if (n.status === 'PENDING' || n.status === 'IN_PROGRESS') pendingTotal += amt;
+
+        const itemsStr = n.items.map((it) => `${it.itemName}: PKR ${Number(it.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`).join(' | ');
+
+        const row = sheet.addRow({
+          date: format(n.createdAt, 'yyyy-MM-dd'),
+          company: n.company.name,
+          title: n.title,
+          items: itemsStr,
+          priority: n.priority,
+          status: n.status,
+          dueDate: n.dueDate ? format(n.dueDate, 'yyyy-MM-dd') : '—',
+          amount: amt
+        });
+
+        row.getCell('amount').numFmt = '#,##0.00';
+        row.getCell('amount').font = { bold: true, color: { argb: n.status === 'FULFILLED' ? 'FF059669' : 'FF2563EB' } };
+      });
+
+      sheet.addRow({});
+      const pendingRow = sheet.addRow({ title: 'TOTAL PENDING DEMANDS', amount: pendingTotal });
+      pendingRow.font = { bold: true };
+      pendingRow.getCell('amount').numFmt = '#,##0.00';
+      pendingRow.getCell('amount').font = { color: { argb: 'FFDC2626' }, bold: true };
+
+      const grandRow = sheet.addRow({ title: 'GRAND TOTAL ALL REQUIREMENTS', amount: grandTotal });
+      grandRow.font = { bold: true };
+      grandRow.getCell('amount').numFmt = '#,##0.00';
+      grandRow.getCell('amount').font = { color: { argb: 'FF1E40AF' }, bold: true };
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=Company_Requirements_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
+
+      await workbook.xlsx.write(res);
+      res.end();
+      return;
+    }
+
     const where = await buildReportWhere(req.query);
+    if (reportType === 'company_funds') {
+      where.type = TransactionType.CASH_IN;
+      where.category = {
+        name: { contains: 'Fund', mode: 'insensitive' }
+      };
+    }
 
     const transactions = await prisma.transaction.findMany({
       where,
@@ -172,7 +347,7 @@ export const exportReportExcel = async (req: Request, res: Response): Promise<vo
     workbook.creator = 'CASHFLOW Financial Management System';
     workbook.created = new Date();
 
-    const sheet = workbook.addWorksheet('Financial Ledger Report');
+    const sheet = workbook.addWorksheet(reportType === 'company_funds' ? 'Company Funds Report' : 'Financial Ledger Report');
 
     sheet.columns = [
       { header: 'Date', key: 'date', width: 14 },
@@ -254,7 +429,160 @@ export const exportReportExcel = async (req: Request, res: Response): Promise<vo
 
 export const exportReportPDF = async (req: Request, res: Response): Promise<void> => {
   try {
+    const { reportType, companyId, status, priority } = req.query;
+
+    // 1. PDF Export for Company Requirements / Demands
+    if (reportType === 'company_requirements') {
+      const noteWhere: any = {};
+      if (companyId && companyId !== 'all') noteWhere.companyId = companyId as string;
+      if (status && status !== 'all') noteWhere.status = status;
+      if (priority && priority !== 'all') noteWhere.priority = priority;
+
+      const notes = await prisma.companyNote.findMany({
+        where: noteWhere,
+        include: {
+          company: true,
+          items: { orderBy: { createdAt: 'asc' } }
+        },
+        orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }]
+      });
+
+      let grandTotal = 0;
+      let pendingTotal = 0;
+      let fulfilledTotal = 0;
+
+      notes.forEach((n) => {
+        const amt = Number(n.totalAmount) || 0;
+        grandTotal += amt;
+        if (n.status === 'PENDING' || n.status === 'IN_PROGRESS') pendingTotal += amt;
+        else if (n.status === 'FULFILLED') fulfilledTotal += amt;
+      });
+
+      const doc = new PDFDocument({
+        size: 'A4',
+        layout: 'landscape',
+        margin: 36,
+        bufferPages: true
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=Company_Requirements_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
+      doc.pipe(res);
+
+      const pageWidth = doc.page.width;
+      const contentWidth = pageWidth - 72; // 770 pt
+
+      const drawReqHeader = (y: number) => {
+        doc.rect(36, y, contentWidth, 20).fill('#1e40af');
+        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
+        doc.text('Date', 42, y + 5, { width: 60 });
+        doc.text('Company', 106, y + 5, { width: 110 });
+        doc.text('Requirement Title', 220, y + 5, { width: 120 });
+        doc.text('Line Items Breakdown', 344, y + 5, { width: 220 });
+        doc.text('Priority', 568, y + 5, { width: 55 });
+        doc.text('Status', 627, y + 5, { width: 65 });
+        doc.text('Amount (PKR)', 696, y + 5, { width: 102, align: 'right' });
+      };
+
+      // Header Title
+      doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold').text('CASHFLOW FINANCIAL MANAGEMENT SYSTEM', 36, 32);
+      doc.fontSize(10).font('Helvetica').fillColor('#64748b').text(
+        `Company Financial Requirements & Demands Statement  •  Generated: ${format(new Date(), 'dd MMMM yyyy, hh:mm a')}`,
+        36,
+        52
+      );
+
+      // KPI Cards
+      const kpiY = 70;
+      const cardWidth = (contentWidth - 24) / 4;
+
+      // Card 1: Pending Total
+      doc.rect(36, kpiY, cardWidth, 42).fillAndStroke('#fff1f2', '#fecdd3');
+      doc.fillColor('#9f1239').fontSize(8).font('Helvetica-Bold').text('PENDING DEMANDS', 44, kpiY + 8);
+      doc.fillColor('#dc2626').fontSize(11).font('Helvetica-Bold').text(`PKR ${pendingTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 44, kpiY + 22);
+
+      // Card 2: Fulfilled Total
+      doc.rect(36 + cardWidth + 8, kpiY, cardWidth, 42).fillAndStroke('#ecfdf5', '#a7f3d0');
+      doc.fillColor('#065f46').fontSize(8).font('Helvetica-Bold').text('FULFILLED DEMANDS', 36 + cardWidth + 16, kpiY + 8);
+      doc.fillColor('#059669').fontSize(11).font('Helvetica-Bold').text(`PKR ${fulfilledTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 36 + cardWidth + 16, kpiY + 22);
+
+      // Card 3: Grand Total
+      doc.rect(36 + (cardWidth + 8) * 2, kpiY, cardWidth, 42).fillAndStroke('#eff6ff', '#bfdbfe');
+      doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold').text('GRAND TOTAL REQUIRED', 36 + (cardWidth + 8) * 2 + 8, kpiY + 8);
+      doc.fillColor('#2563eb').fontSize(11).font('Helvetica-Bold').text(`PKR ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 36 + (cardWidth + 8) * 2 + 8, kpiY + 22);
+
+      // Card 4: Total Records
+      doc.rect(36 + (cardWidth + 8) * 3, kpiY, cardWidth, 42).fillAndStroke('#f8fafc', '#e2e8f0');
+      doc.fillColor('#475569').fontSize(8).font('Helvetica-Bold').text('TOTAL DEMANDS', 36 + (cardWidth + 8) * 3 + 8, kpiY + 8);
+      doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text(`${notes.length} Demands`, 36 + (cardWidth + 8) * 3 + 8, kpiY + 22);
+
+      let currentY = 126;
+      drawReqHeader(currentY);
+      currentY += 20;
+
+      doc.font('Helvetica').fontSize(8);
+
+      notes.forEach((n, idx) => {
+        if (currentY > 510) {
+          doc.addPage();
+          currentY = 36;
+          drawReqHeader(currentY);
+          currentY += 20;
+          doc.font('Helvetica').fontSize(8);
+        }
+
+        if (idx % 2 === 0) {
+          doc.rect(36, currentY, contentWidth, 20).fill('#f8fafc');
+        }
+
+        const itemsSummary = n.items.map((it) => `${it.itemName} (${Number(it.amount).toLocaleString('en-US')})`).join(', ');
+
+        doc.fillColor('#334155');
+        doc.text(format(n.createdAt, 'yyyy-MM-dd'), 42, currentY + 5, { width: 60 });
+        doc.text(n.company.name.slice(0, 18), 106, currentY + 5, { width: 110 });
+        doc.font('Helvetica-Bold').text(n.title.slice(0, 22), 220, currentY + 5, { width: 120 });
+
+        doc.font('Helvetica').fillColor('#64748b');
+        doc.text(itemsSummary.slice(0, 48), 344, currentY + 5, { width: 220 });
+
+        // Priority Badge
+        doc.font('Helvetica-Bold').fillColor(n.priority === 'URGENT' ? '#b91c1c' : '#d97706');
+        doc.text(n.priority, 568, currentY + 5, { width: 55 });
+
+        // Status Badge
+        doc.fillColor(n.status === 'FULFILLED' ? '#059669' : n.status === 'IN_PROGRESS' ? '#d97706' : '#2563eb');
+        doc.text(n.status, 627, currentY + 5, { width: 65 });
+
+        // Amount
+        const amtStr = Number(n.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 });
+        doc.fillColor('#0f172a').text(`PKR ${amtStr}`, 696, currentY + 5, { width: 102, align: 'right' });
+
+        currentY += 20;
+      });
+
+      const range = doc.bufferedPageRange();
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(8).fillColor('#94a3b8').text(
+          `Page ${i + 1} of ${range.count}   •   CASHFLOW Financial Suite   •   Company Requirements Statement`,
+          36,
+          doc.page.height - 24,
+          { align: 'center', width: contentWidth }
+        );
+      }
+
+      doc.end();
+      return;
+    }
+
+    const isFundsReport = reportType === 'company_funds';
     const where = await buildReportWhere(req.query);
+    if (isFundsReport) {
+      where.type = TransactionType.CASH_IN;
+      where.category = {
+        name: { contains: 'Fund', mode: 'insensitive' }
+      };
+    }
 
     // Fetch COMPLETE transactions dataset (no arbitrary limit!)
     const transactions = await prisma.transaction.findMany({
@@ -280,7 +608,7 @@ export const exportReportPDF = async (req: Request, res: Response): Promise<void
     });
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=Financial_Statement_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=${isFundsReport ? 'Company_Funds_Statement' : 'Financial_Statement'}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
 
     doc.pipe(res);
 
@@ -304,7 +632,7 @@ export const exportReportPDF = async (req: Request, res: Response): Promise<void
     // Header Title
     doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold').text('CASHFLOW FINANCIAL MANAGEMENT SYSTEM', 36, 32);
     doc.fontSize(10).font('Helvetica').fillColor('#64748b').text(
-      `Executive Financial Statement  •  Generated: ${format(new Date(), 'dd MMMM yyyy, hh:mm a')}`,
+      `${isFundsReport ? 'Company Funds Injection Statement' : 'Executive Financial Statement'}  •  Generated: ${format(new Date(), 'dd MMMM yyyy, hh:mm a')}`,
       36,
       52
     );
@@ -313,9 +641,9 @@ export const exportReportPDF = async (req: Request, res: Response): Promise<void
     const kpiY = 70;
     const cardWidth = (contentWidth - 24) / 4;
 
-    // Card 1: Inflow
+    // Card 1: Inflow / Funds Injected
     doc.rect(36, kpiY, cardWidth, 42).fillAndStroke('#ecfdf5', '#a7f3d0');
-    doc.fillColor('#065f46').fontSize(8).font('Helvetica-Bold').text('TOTAL INFLOW', 44, kpiY + 8);
+    doc.fillColor('#065f46').fontSize(8).font('Helvetica-Bold').text(isFundsReport ? 'TOTAL FUNDS INJECTED' : 'TOTAL INFLOW', 44, kpiY + 8);
     doc.fillColor('#059669').fontSize(11).font('Helvetica-Bold').text(`+PKR ${Number(totalIn).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 44, kpiY + 22);
 
     // Card 2: Outflow
@@ -406,7 +734,42 @@ export const exportReportPDF = async (req: Request, res: Response): Promise<void
 
 export const exportReportCSV = async (req: Request, res: Response): Promise<void> => {
   try {
+    const { reportType, companyId, status, priority } = req.query;
+
+    if (reportType === 'company_requirements') {
+      const noteWhere: any = {};
+      if (companyId && companyId !== 'all') noteWhere.companyId = companyId as string;
+      if (status && status !== 'all') noteWhere.status = status;
+      if (priority && priority !== 'all') noteWhere.priority = priority;
+
+      const notes = await prisma.companyNote.findMany({
+        where: noteWhere,
+        include: { company: true, items: { orderBy: { createdAt: 'asc' } } },
+        orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }]
+      });
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=Company_Requirements_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+
+      let csv = 'Note ID,Created Date,Company,Requirement Title,Line Items Breakdown,Priority,Status,Due Date,Total Amount (PKR),Notes\n';
+
+      notes.forEach((n) => {
+        const itemsStr = n.items.map((it) => `${it.itemName}: ${it.amount}`).join('; ');
+        csv += `"${n.id}","${format(n.createdAt, 'yyyy-MM-dd')}","${n.company.name}","${n.title.replace(/"/g, '""')}","${itemsStr.replace(/"/g, '""')}","${n.priority}","${n.status}","${n.dueDate ? format(n.dueDate, 'yyyy-MM-dd') : ''}",${n.totalAmount},"${(n.notes || '').replace(/"/g, '""')}"\n`;
+      });
+
+      res.send(csv);
+      return;
+    }
+
+    const isFundsReport = reportType === 'company_funds';
     const where = await buildReportWhere(req.query);
+    if (isFundsReport) {
+      where.type = TransactionType.CASH_IN;
+      where.category = {
+        name: { contains: 'Fund', mode: 'insensitive' }
+      };
+    }
 
     const transactions = await prisma.transaction.findMany({
       where,
@@ -415,7 +778,7 @@ export const exportReportCSV = async (req: Request, res: Response): Promise<void
     });
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=CashFlow_Ledger_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=${isFundsReport ? 'Company_Funds_Statement' : 'CashFlow_Ledger'}_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
 
     let csv = 'Transaction ID,Date,Company,Type,Category,Party/Vendor,Payment Account,Amount (PKR),Reference,Description\n';
 

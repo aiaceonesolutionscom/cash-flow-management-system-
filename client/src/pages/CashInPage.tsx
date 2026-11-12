@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { PlusCircle, Search, Trash2, ArrowDownRight, Paperclip, Loader2, RefreshCw, Calendar } from 'lucide-react';
+import { PlusCircle, Search, Trash2, ArrowDownRight, Paperclip, Loader2, RefreshCw, Calendar, Building2 } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
-import { Transaction } from '../types';
+import { Transaction, Category } from '../types';
 import { format } from 'date-fns';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { Pagination } from '../components/common/Pagination';
@@ -16,11 +16,13 @@ interface CashInPageProps {
 export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
   const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [totalAmount, setTotalAmount] = useState<string>('0.00');
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -36,6 +38,31 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
     party: string;
   } | null>(null);
 
+  // Fetch income categories for filter dropdown
+  useEffect(() => {
+    const fetchIncomeCategories = async () => {
+      try {
+        const res = await api.get('/categories', {
+          params: { companyId: selectedCompanyId, type: 'INCOME' }
+        });
+        if (res.data.success) {
+          const raw: Category[] = res.data.categories || [];
+          const seen = new Set<string>();
+          const unique = raw.filter((c) => {
+            const k = c.name.trim().toLowerCase();
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+          setCategories(unique);
+        }
+      } catch (err) {
+        console.error('Failed to load income categories', err);
+      }
+    };
+    fetchIncomeCategories();
+  }, [selectedCompanyId]);
+
   const fetchCashIn = async () => {
     try {
       setIsLoading(true);
@@ -43,6 +70,7 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
         companyId: selectedCompanyId,
         search: searchTerm || undefined,
         accountType: accountFilter !== 'all' ? accountFilter : undefined,
+        categoryId: categoryFilter !== 'all' ? categoryFilter : undefined,
         page,
         limit
       };
@@ -62,7 +90,7 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
 
   useEffect(() => {
     fetchCashIn();
-  }, [selectedCompanyId, accountFilter, page, limit, refreshTrigger]);
+  }, [selectedCompanyId, accountFilter, categoryFilter, page, limit, refreshTrigger]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,6 +143,11 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
     }
   };
 
+  const fundCategory = categories.find((c) => c.name.toLowerCase().includes('fund'));
+  const isFundFilterActive = Boolean(
+    categoryFilter === 'company_funds' || (fundCategory && categoryFilter === fundCategory.id)
+  );
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
       {/* Header */}
@@ -134,7 +167,7 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
         <div className="flex items-center space-x-3">
           <button
             onClick={fetchCashIn}
-            className="p-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs"
+            className="p-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs cursor-pointer"
             title="Refresh list"
           >
             <RefreshCw className="w-4 h-4" />
@@ -142,7 +175,7 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
 
           <button
             onClick={onOpenCreate}
-            className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs"
+            className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer"
           >
             <PlusCircle className="w-4 h-4 mr-1.5" />
             Add Cash In
@@ -154,49 +187,110 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Cash In Inflow</div>
-            <div className="text-2xl font-bold text-emerald-600 tabular-nums mt-1">{formatPKR(totalAmount)}</div>
+            <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Cash In Inflow</div>
+            <div className="text-2xl font-bold text-indigo-600 tabular-nums mt-1">{formatPKR(totalAmount)}</div>
           </div>
-          <span className="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 font-semibold rounded-full">
+          <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 font-medium rounded-full">
             {totalCount} Total Entries
           </span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Financial Account Impact</div>
+            <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">Financial Account Impact</div>
             <div className="text-xs text-slate-600 mt-1">Each Cash In entry automatically increases the balance of its assigned account.</div>
           </div>
         </div>
       </div>
 
       {/* Filters & Search Toolbar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <form onSubmit={handleSearch} className="relative flex-1 w-full">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by payer, receipt #, or description..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-        </form>
-
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
-          <select
-            value={accountFilter}
-            onChange={(e) => {
-              setAccountFilter(e.target.value);
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+        {/* Quick Filter Pills */}
+        <div className="flex items-center space-x-2 overflow-x-auto pb-1 border-b border-slate-100">
+          <button
+            type="button"
+            onClick={() => {
+              setCategoryFilter('all');
               setPage(1);
             }}
-            className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-semibold cursor-pointer"
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              categoryFilter === 'all'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+            }`}
           >
-            <option value="all">All Payment Types</option>
-            <option value="CASH">💵 Cash</option>
-            <option value="BANK">🏦 Bank</option>
-            <option value="WALLET">📱 Wallet</option>
-          </select>
+            All Inflows
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setCategoryFilter(fundCategory ? fundCategory.id : 'company_funds');
+              setPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 whitespace-nowrap ${
+              isFundFilterActive
+                ? 'bg-blue-600 text-white shadow-2xs'
+                : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>🏢 Company Funds Injected</span>
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <form onSubmit={handleSearch} className="relative flex-1 w-full">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by payer, receipt #, or description..."
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+            />
+          </form>
+
+          <div className="flex items-center space-x-2 w-full sm:w-auto flex-wrap">
+            {/* Category Dropdown Filter */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-semibold cursor-pointer max-w-[200px] truncate"
+            >
+              <option value="all">All Categories</option>
+              {fundCategory ? (
+                <option value={fundCategory.id}>🏢 Company Funds</option>
+              ) : (
+                <option value="company_funds">🏢 Company Funds</option>
+              )}
+              {categories
+                .filter((c) => !c.name.toLowerCase().includes('fund'))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+
+            {/* Account Type Filter */}
+            <select
+              value={accountFilter}
+              onChange={(e) => {
+                setAccountFilter(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-semibold cursor-pointer"
+            >
+              <option value="all">All Accounts</option>
+              <option value="CASH">💵 Cash</option>
+              <option value="BANK">🏦 Bank</option>
+              <option value="WALLET">📱 Wallet</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -224,7 +318,7 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
                       <span className="text-slate-300">•</span>
                       <span className="text-slate-700 font-semibold">{tx.company.name}</span>
                     </div>
-                    <div className="text-sm font-bold text-emerald-600 tabular-nums">
+                    <div className="text-sm font-semibold text-indigo-600 tabular-nums">
                       +{formatPKR(tx.amount)}
                     </div>
                   </div>
@@ -328,7 +422,7 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">{tx.referenceNo || '—'}</td>
-                      <td className="py-3 px-4 text-right font-bold text-emerald-600 tabular-nums">
+                      <td className="py-3 px-4 text-right font-semibold text-indigo-600 tabular-nums">
                         +{formatPKR(tx.amount)}
                       </td>
                       <td className="py-3 px-4 text-center">

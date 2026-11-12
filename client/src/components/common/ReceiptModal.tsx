@@ -27,8 +27,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
   if (!isOpen || !attachmentId) return null;
 
-  const viewUrl = `/api/attachments/${attachmentId}/view`;
-  const downloadUrl = `/api/attachments/${attachmentId}/download`;
+  const token = localStorage.getItem('cashflow_token');
+  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+  const viewUrl = `/api/attachments/${attachmentId}/view${tokenParam}`;
+  const downloadUrl = `/api/attachments/${attachmentId}/download${tokenParam}`;
   const isPdf = mimeType.includes('pdf') || originalName.toLowerCase().endsWith('.pdf');
 
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.25, 3));

@@ -32,10 +32,12 @@ export const ReportsPage: React.FC = () => {
 
   const reportOptions = [
     { id: 'cash_flow', label: '1. Cash Flow Statement' },
-    { id: 'company_wise', label: '2. Company-Wise Analysis' },
-    { id: 'category_wise', label: '3. Category Breakdown' },
-    { id: 'account_wise', label: '4. Account Balances' },
-    { id: 'monthly', label: '5. Monthly Trend Report' },
+    { id: 'company_requirements', label: '2. Company Requirements & Demands' },
+    { id: 'company_funds', label: '3. Company Funds Statement' },
+    { id: 'company_wise', label: '4. Company-Wise Analysis' },
+    { id: 'category_wise', label: '5. Category Breakdown' },
+    { id: 'account_wise', label: '6. Account Balances' },
+    { id: 'monthly', label: '7. Monthly Trend Report' },
   ];
 
   // Fetch dropdown categories with deduplication
@@ -139,6 +141,7 @@ export const ReportsPage: React.FC = () => {
   const handleExport = (formatType: 'excel' | 'pdf' | 'csv') => {
     setIsExporting(formatType);
     const params = new URLSearchParams();
+    params.append('reportType', reportType);
     if (selectedCompanyId && selectedCompanyId !== 'all') params.append('companyId', selectedCompanyId);
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
@@ -358,14 +361,52 @@ export const ReportsPage: React.FC = () => {
       </div>
 
       {/* KPI Statement Strip */}
-      {reportData && (
+      {reportData && reportType === 'company_requirements' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Grand Total Required</span>
+            <div className="text-xl font-bold text-blue-600 tabular-nums mt-1">
+              {formatPKR(reportData.grandTotal)}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">All companies requirement</div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Demands</span>
+            <div className="text-xl font-bold text-rose-600 tabular-nums mt-1">
+              {formatPKR(reportData.pendingTotal)}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">Awaiting fund disbursement</div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fulfilled Demands</span>
+            <div className="text-xl font-bold text-emerald-600 tabular-nums mt-1">
+              {formatPKR(reportData.fulfilledTotal)}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">Funds successfully provided</div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Requirements</span>
+            <div className="text-xl font-bold text-slate-900 tabular-nums mt-1">
+              {reportData.totalCount || 0} Demands
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">Itemized budget records</div>
+          </div>
+        </div>
+      ) : reportData && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Statement Cash In</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              {reportType === 'company_funds' ? 'Funds Injected' : 'Statement Cash In'}
+            </span>
             <div className="text-xl font-bold text-emerald-600 tabular-nums mt-1">
               +{formatPKR(reportData.summary?.totalCashIn)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">Total incoming payments</div>
+            <div className="text-[11px] text-slate-400 mt-1">
+              {reportType === 'company_funds' ? 'Total capital injected' : 'Total incoming payments'}
+            </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -402,7 +443,107 @@ export const ReportsPage: React.FC = () => {
         ) : (
           <div>
             {/* View Renderers based on Report Type */}
-            {reportType === 'company_wise' ? (
+            {reportType === 'company_requirements' ? (
+              <div className="p-4 space-y-4">
+                {/* Company Breakdown Subtotals */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {reportData.companySummaries?.map((cs: any) => (
+                    <div key={cs.companyName} className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                        <span className="truncate">{cs.companyName}</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-bold">
+                          {cs.count} Notes
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between text-xs">
+                        <span className="text-slate-400 font-medium">Pending:</span>
+                        <span className="font-bold text-rose-600">{formatPKR(cs.pending)}</span>
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between text-xs">
+                        <span className="text-slate-400 font-medium">Total:</span>
+                        <span className="font-bold text-slate-800">{formatPKR(cs.total)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Table of Notes */}
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-left text-xs min-w-[700px]">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-4">Company</th>
+                        <th className="py-3 px-4">Requirement Title</th>
+                        <th className="py-3 px-4">Line Items Breakdown</th>
+                        <th className="py-3 px-4">Priority</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Total Amount (PKR)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {reportData.notes?.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-xs text-slate-400">
+                            No company requirements recorded.
+                          </td>
+                        </tr>
+                      ) : (
+                        reportData.notes?.map((n: any) => (
+                          <tr key={n.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                              {format(new Date(n.createdAt), 'dd MMM yyyy')}
+                            </td>
+                            <td className="py-3 px-4 font-bold text-slate-800 whitespace-nowrap">
+                              {n.company.name}
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-slate-900">
+                              {n.title}
+                              {n.dueDate && (
+                                <div className="text-[10px] text-slate-400">
+                                  Needed by: {format(new Date(n.dueDate), 'dd MMM yyyy')}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex flex-wrap gap-1 max-w-sm">
+                                {n.items?.map((it: any, idx: number) => (
+                                  <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px]">
+                                    <span className="font-semibold">{it.itemName}:</span>
+                                    <span className="ml-1 font-bold text-slate-900">{formatPKR(it.amount)}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                n.priority === 'URGENT' ? 'bg-rose-100 text-rose-700' :
+                                n.priority === 'HIGH' ? 'bg-amber-100 text-amber-700' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                                {n.priority}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                n.status === 'FULFILLED' ? 'bg-emerald-50 text-emerald-700' :
+                                n.status === 'IN_PROGRESS' ? 'bg-amber-50 text-amber-700' :
+                                'bg-rose-50 text-rose-700'
+                              }`}>
+                                {n.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right font-bold text-blue-700 tabular-nums whitespace-nowrap">
+                              {formatPKR(n.totalAmount)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : reportType === 'company_wise' ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs min-w-[500px]">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAdmin } from '../middleware/auth';
 import { uploadReceipt } from '../middleware/upload';
+import { loginRateLimiter, passwordChangeRateLimiter, generalApiRateLimiter } from '../middleware/rateLimiter';
 
 // Controllers
 import * as authController from '../controllers/authController';
@@ -15,15 +16,19 @@ import * as dashboardController from '../controllers/dashboardController';
 import * as reportController from '../controllers/reportController';
 import * as auditController from '../controllers/auditController';
 import * as attachmentController from '../controllers/attachmentController';
+import * as companyNoteController from '../controllers/companyNoteController';
 
 const router = Router();
 
+// Global API Request Rate Limiter (Protects against DoS & automated scrapers)
+router.use(generalApiRateLimiter);
+
 // Auth Endpoints (Single Admin)
-router.post('/auth/login', authController.login);
+router.post('/auth/login', loginRateLimiter, authController.login);
 router.post('/auth/logout', authController.logout);
 router.get('/auth/me', requireAdmin, authController.getMe);
 router.patch('/auth/profile', requireAdmin, authController.updateProfile);
-router.post('/auth/change-password', requireAdmin, authController.changePassword);
+router.post('/auth/change-password', requireAdmin, passwordChangeRateLimiter, authController.changePassword);
 
 // Companies
 router.get('/companies', requireAdmin, companyController.getCompanies);
@@ -73,8 +78,16 @@ router.get('/reports/export/csv', requireAdmin, reportController.exportReportCSV
 // Audit Logs
 router.get('/audit-logs', requireAdmin, auditController.getAuditLogs);
 
-// Attachments / Receipts (Streamed directly from PostgreSQL bytes)
-router.get('/attachments/:id/view', attachmentController.getAttachment);
-router.get('/attachments/:id/download', attachmentController.downloadAttachment);
+// Company Notes & Financial Requirements
+router.get('/company-notes', requireAdmin, companyNoteController.getCompanyNotes);
+router.get('/company-notes/summary', requireAdmin, companyNoteController.getCompanyNotesSummary);
+router.post('/company-notes', requireAdmin, companyNoteController.createCompanyNote);
+router.put('/company-notes/:id', requireAdmin, companyNoteController.updateCompanyNote);
+router.patch('/company-notes/:id/status', requireAdmin, companyNoteController.updateCompanyNoteStatus);
+router.delete('/company-notes/:id', requireAdmin, companyNoteController.deleteCompanyNote);
+
+// Attachments / Receipts (Streamed directly from PostgreSQL bytes - Strictly Protected)
+router.get('/attachments/:id/view', requireAdmin, attachmentController.getAttachment);
+router.get('/attachments/:id/download', requireAdmin, attachmentController.downloadAttachment);
 
 export default router;

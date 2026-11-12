@@ -105,23 +105,23 @@ export const DashboardPage: React.FC = () => {
         {/* Total Available Balance */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Available Balance</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Total Available Balance</span>
+            <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 tabular-nums truncate">
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums truncate">
               {formatPKR(cards.totalAvailableBalance)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Total liquid capital in PKR</div>
+            <div className="text-[11px] text-slate-400 mt-0.5 font-normal">Total liquid capital in PKR</div>
           </div>
         </div>
 
         {/* Net Cash Flow */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Net Cash Flow</span>
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Net Cash Flow</span>
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
               netFlowNum >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
             }`}>
@@ -129,46 +129,46 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="mt-3">
-            <div className={`text-xl sm:text-2xl font-extrabold tabular-nums truncate ${
+            <div className={`text-xl sm:text-2xl font-bold tabular-nums truncate ${
               netFlowNum >= 0 ? 'text-emerald-600' : 'text-rose-600'
             }`}>
               {formatPKR(cards.netCashFlow)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
+            <div className="text-[11px] text-slate-400 mt-0.5 font-normal">
               {netFlowNum >= 0 ? 'Net period surplus' : 'Net period deficit'}
             </div>
           </div>
         </div>
 
-        {/* Total Cash In */}
+        {/* Total Cash In (Distinctive Royal Indigo Color) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Cash In</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Total Cash In</span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
               <ArrowDownRight className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-xl sm:text-2xl font-extrabold text-emerald-600 tabular-nums truncate">
+            <div className="text-xl sm:text-2xl font-bold text-indigo-600 tabular-nums truncate">
               +{formatPKR(cards.totalCashIn)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Total incoming payments</div>
+            <div className="text-[11px] text-slate-400 mt-0.5 font-normal">Total incoming payments</div>
           </div>
         </div>
 
         {/* Total Cash Out / Expenses */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Cash Out</span>
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Total Cash Out</span>
             <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
               <ArrowUpRight className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-xl sm:text-2xl font-extrabold text-rose-600 tabular-nums truncate">
+            <div className="text-xl sm:text-2xl font-bold text-rose-600 tabular-nums truncate">
               -{formatPKR(cards.totalCashOut)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Total outgoing expenditures</div>
+            <div className="text-[11px] text-slate-400 mt-0.5 font-normal">Total outgoing expenditures</div>
           </div>
         </div>
       </div>
@@ -215,6 +215,31 @@ export const DashboardPage: React.FC = () => {
             </span>
           </div>
         </div>
+
+        {/* Funds & Requirements Quick Strip */}
+        <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Company Funds Injected */}
+          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100/80 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-600">Company Funds Injected</div>
+              <div className="text-xs text-slate-500">Recorded capital injections</div>
+            </div>
+            <div className="text-sm sm:text-base font-bold text-blue-700 tabular-nums">
+              {formatPKR(cards.totalFundsInjected || 0)}
+            </div>
+          </div>
+
+          {/* Active Demands / Requirements */}
+          <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-100/80 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Active Company Requirements</div>
+              <div className="text-xs text-slate-500">{cards.activeRequirementsCount || 0} pending demands</div>
+            </div>
+            <div className="text-sm sm:text-base font-bold text-amber-700 tabular-nums">
+              {formatPKR(cards.totalRequirementsPending || 0)}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Primary Analytics Charts Row */}
@@ -241,7 +266,7 @@ export const DashboardPage: React.FC = () => {
                   contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px', fontSize: '12px' }}
                 />
                 <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
-                <Bar dataKey="cashIn" name="Cash In" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cashIn" name="Cash In" fill="#6366f1" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="cashOut" name="Cash Out" fill="#ef4444" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

@@ -147,7 +147,11 @@ export const getCashInList = async (req: Request, res: Response): Promise<void> 
       where.account = { type: accountType };
     }
     if (categoryId && categoryId !== 'all') {
-      if (!companyId || companyId === 'all') {
+      if (categoryId === 'company_funds') {
+        where.category = {
+          name: { contains: 'Fund', mode: 'insensitive' }
+        };
+      } else if (!companyId || companyId === 'all') {
         const cat = await prisma.category.findUnique({ where: { id: categoryId as string } });
         if (cat) {
           const siblingCats = await prisma.category.findMany({

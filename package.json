@@ -3,12 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "description": "Production-quality Expense & Cash Flow Management System for 3 Companies in PKR",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "build:server": "npm run build --prefix server",
+    "build:client": "npm run build --prefix client",
+    "prisma:generate": "npm run prisma:generate --prefix server",
+    "prisma:push": "cd server && npx prisma db push",
+    "prisma:seed": "npm run prisma:seed --prefix server",
     "server": "cd server && npm run dev",
     "client": "cd client && npm run dev",
-    "test": "cd server && npm run test",
-    "seed": "cd server && npm run prisma:seed",
-    "build": "cd server && npm run build && cd ../client && npm run build"
+    "test": "cd server && npm run test"
   },
-  "keywords": ["finance", "cashflow", "expense-management", "pkr", "react", "postgresql", "prisma"]
+  "keywords": ["finance", "cashflow", "expense-management", "pkr", "react", "postgresql", "prisma", "cpanel"]
 }
