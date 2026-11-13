@@ -10,7 +10,8 @@ import {
   Wallet,
   Building,
   CreditCard,
-  RefreshCw
+  RefreshCw,
+  ArrowRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -34,7 +35,11 @@ import { format } from 'date-fns';
 
 const PIE_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777', '#0891b2', '#4b5563'];
 
-export const DashboardPage: React.FC = () => {
+interface DashboardPageProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const { selectedCompanyId, dateRange, startDate, endDate, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -249,9 +254,22 @@ export const DashboardPage: React.FC = () => {
             <h3 className="text-sm font-bold text-slate-900">Recent Transactions</h3>
             <p className="text-xs text-slate-400">Latest recorded income & expense activities</p>
           </div>
-          <span className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full">
-            Top 5 Recent
-          </span>
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full">
+              Top 5 Recent
+            </span>
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('transactions')}
+                className="px-3 py-1 bg-white hover:bg-blue-50 text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer shadow-2xs"
+                title="View All Transactions"
+              >
+                <span>View All</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {recentTransactions.length === 0 ? (

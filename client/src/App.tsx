@@ -63,7 +63,7 @@ const MainLayout: React.FC = () => {
   const renderActivePage = () => {
     switch (currentTab) {
       case 'dashboard':
-        return <DashboardPage />;
+        return <DashboardPage onNavigate={(tab) => setCurrentTab(tab)} />;
       case 'funds':
         return <FundsPage companies={companies} />;
       case 'cash-in':
