@@ -13,6 +13,14 @@ interface AvailableFundOption {
   remainingAmount: number;
 }
 
+interface SpilloverPlanItem {
+  fundId: string;
+  title: string;
+  amount: number;
+  remainingAfter: number;
+  isPrimary: boolean;
+}
+
 interface CashInModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -53,10 +61,12 @@ export const CashInModal: React.FC<CashInModalProps> = ({
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [spilloverPlan, setSpilloverPlan] = useState<SpilloverPlanItem[] | null>(null);
 
   // Load available funds from pool
   useEffect(() => {
     if (isOpen) {
+      setSpilloverPlan(null);
       const fetchAvailableFunds = async () => {
         try {
           const res = await api.get('/funds/available');
@@ -80,6 +90,7 @@ export const CashInModal: React.FC<CashInModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setSpilloverPlan(null);
       if (editTransaction) {
         setCompanyId(editTransaction.companyId);
         setAmount(String(editTransaction.amount));
@@ -232,31 +243,13 @@ export const CashInModal: React.FC<CashInModalProps> = ({
     (c) => c.name.toLowerCase() === categoryInput.trim().toLowerCase()
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    const finalCatName = categoryInput.trim();
-    if (!companyId || !accountId || (!categoryId && !finalCatName) || !amount || !party || !paymentDate) {
-      setError('Please fill in all mandatory fields.');
-      return;
-    }
-
-    if (parseFloat(amount) <= 0) {
-      setError('Amount must be greater than zero.');
-      return;
-    }
-
-    if (selectedFundId) {
-      const found = availableFunds.find((f) => f.id === selectedFundId);
-      if (found && parseFloat(amount) > found.remainingAmount) {
-        setError(`Entered amount (PKR ${parseFloat(amount).toLocaleString()}) exceeds available fund balance (PKR ${found.remainingAmount.toLocaleString()}).`);
-        return;
-      }
-    }
-
+  const executeSave = async (overrideAmount?: string, allocations?: SpilloverPlanItem[]) => {
     try {
       setIsSubmitting(true);
+      setError('');
+      const finalCatName = categoryInput.trim();
+      const finalAmount = overrideAmount !== undefined ? overrideAmount : amount;
+
       const formData = new FormData();
       formData.append('companyId', companyId);
       formData.append('accountId', accountId);
@@ -267,13 +260,21 @@ export const CashInModal: React.FC<CashInModalProps> = ({
         formData.append('categoryName', finalCatName);
       }
 
-      formData.append('amount', amount);
+      formData.append('amount', finalAmount);
       formData.append('party', party);
       formData.append('paymentDate', paymentDate);
       if (referenceNo) formData.append('referenceNo', referenceNo);
       if (description) formData.append('description', description);
       if (receiptFile) formData.append('receipt', receiptFile);
-      if (selectedFundId) formData.append('companyFundId', selectedFundId);
+
+      if (allocations && allocations.length > 0) {
+        formData.append(
+          'fundAllocations',
+          JSON.stringify(allocations.map((a) => ({ fundId: a.fundId, amount: a.amount })))
+        );
+      } else if (selectedFundId) {
+        formData.append('companyFundId', selectedFundId);
+      }
 
       const res = editTransaction
         ? await api.put(`/cash-in/${editTransaction.id}`, formData, {
@@ -292,6 +293,86 @@ export const CashInModal: React.FC<CashInModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDenySpillover = async () => {
+    if (!spilloverPlan || spilloverPlan.length === 0) return;
+    const primaryAlloc = spilloverPlan[0];
+    const restrictedAmount = String(primaryAlloc.amount);
+    setAmount(restrictedAmount);
+    setSpilloverPlan(null);
+    await executeSave(restrictedAmount, undefined);
+  };
+
+  const handleAcceptSpillover = async () => {
+    if (!spilloverPlan) return;
+    const planToExecute = [...spilloverPlan];
+    setSpilloverPlan(null);
+    await executeSave(amount, planToExecute);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const finalCatName = categoryInput.trim();
+    if (!companyId || !accountId || (!categoryId && !finalCatName) || !amount || !party || !paymentDate) {
+      setError('Please fill in all mandatory fields.');
+      return;
+    }
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setError('Amount must be greater than zero.');
+      return;
+    }
+
+    if (!editTransaction && selectedFundId) {
+      const found = availableFunds.find((f) => f.id === selectedFundId);
+      if (found && numAmount > found.remainingAmount) {
+        // Check other funds in available pool
+        const otherFunds = availableFunds.filter((f) => f.id !== selectedFundId && f.remainingAmount > 0);
+        const otherTotal = otherFunds.reduce((sum, f) => sum + f.remainingAmount, 0);
+        const totalPool = found.remainingAmount + otherTotal;
+
+        if (numAmount > totalPool) {
+          setError(
+            `Entered amount (PKR ${numAmount.toLocaleString()}) exceeds total available pool across all funds (PKR ${totalPool.toLocaleString()}). Maximum available is PKR ${totalPool.toLocaleString()}.`
+          );
+          return;
+        }
+
+        // Build spillover deduction plan
+        const plan: SpilloverPlanItem[] = [];
+        plan.push({
+          fundId: found.id,
+          title: found.title,
+          amount: found.remainingAmount,
+          remainingAfter: 0,
+          isPrimary: true
+        });
+
+        let needed = numAmount - found.remainingAmount;
+        for (const f of otherFunds) {
+          if (needed <= 0) break;
+          const take = Math.min(needed, f.remainingAmount);
+          plan.push({
+            fundId: f.id,
+            title: f.title,
+            amount: take,
+            remainingAfter: f.remainingAmount - take,
+            isPrimary: false
+          });
+          needed -= take;
+        }
+
+        // Trigger user confirmation permission dialog
+        setSpilloverPlan(plan);
+        return;
+      }
+    }
+
+    await executeSave();
   };
 
   return (
@@ -573,6 +654,122 @@ export const CashInModal: React.FC<CashInModalProps> = ({
             </button>
           </div>
         </form>
+
+        {/* Multi-Fund Deduction Confirmation Dialog */}
+        {spilloverPlan && spilloverPlan.length > 0 && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="px-5 py-4 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200/80 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <Coins className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">Fund Spillover Deduction Confirmation</h4>
+                    <p className="text-[11px] text-amber-700 font-medium">Selected fund balance is insufficient for requested amount</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSpilloverPlan(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/80"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 space-y-4">
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 leading-relaxed">
+                  Selected fund <strong className="text-slate-800">"{spilloverPlan[0].title}"</strong> only has{' '}
+                  <strong className="text-emerald-700">PKR {spilloverPlan[0].amount.toLocaleString()}</strong> remaining.
+                  To complete your requested Cash In of{' '}
+                  <strong className="text-blue-700">PKR {parseFloat(amount).toLocaleString()}</strong>, the remaining{' '}
+                  <strong className="text-amber-700">
+                    PKR {(parseFloat(amount) - spilloverPlan[0].amount).toLocaleString()}
+                  </strong>{' '}
+                  can be deducted from next available fund(s):
+                </div>
+
+                {/* Deduction Breakdown */}
+                <div className="space-y-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Proposed Allocation Breakdown:
+                  </div>
+                  <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-xs">
+                    {spilloverPlan.map((item, idx) => (
+                      <div key={item.fundId} className="p-3 flex items-center justify-between text-xs">
+                        <div className="flex items-center space-x-2.5">
+                          <span
+                            className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                              item.isPrimary ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <div className="font-bold text-slate-800">{item.title}</div>
+                            <div className="text-[10px] text-slate-400">
+                              {item.isPrimary
+                                ? 'Selected Fund (Fully exhausted)'
+                                : `Available Fund (PKR ${item.remainingAfter.toLocaleString()} will remain)`}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-extrabold text-slate-900 tabular-nums">
+                            PKR {item.amount.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="p-3 bg-slate-50 flex items-center justify-between text-xs font-bold border-t border-slate-200">
+                      <span className="text-slate-700">Total Cash In Amount</span>
+                      <span className="text-emerald-700 text-sm tabular-nums">
+                        PKR {parseFloat(amount).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-500 italic">
+                  * Agar aap <strong>Deny</strong> karenge, to sirf PKR {spilloverPlan[0].amount.toLocaleString()} cash in hoga. Agar aap <strong>Accept</strong> karenge, to poore PKR {parseFloat(amount).toLocaleString()} dono funds se kat kar record honge.
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleDenySpillover}
+                  className="px-4 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition-all shadow-xs cursor-pointer text-center"
+                >
+                  Deny — Restrict to PKR {spilloverPlan[0].amount.toLocaleString()}
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleAcceptSpillover}
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm shadow-emerald-500/20 rounded-xl cursor-pointer text-center flex items-center justify-center space-x-1.5"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                      <span>Allocating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>Accept — Deduct PKR {parseFloat(amount).toLocaleString()} Across Funds</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

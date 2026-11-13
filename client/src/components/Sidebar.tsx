@@ -150,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="p-4 border-t border-slate-200 bg-slate-50/70 shrink-0">
             <div className="text-xs text-slate-600">
               <div className="font-semibold text-slate-800">PKR (₨) Currency</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">3 Companies Integrated</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Connected Entities</div>
             </div>
           </div>
         )}

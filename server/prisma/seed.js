@@ -36,7 +36,8 @@ const DEFAULT_INCOME_CATEGORIES = [
 const COMPANIES = [
     { name: 'Global Tech International', code: 'GTI' },
     { name: 'Krunch 360', code: 'K360' },
-    { name: 'Global Sourcing International', code: 'GSI' }
+    { name: 'Global Sourcing International', code: 'GSI' },
+    { name: 'Grouped Company Assets', code: 'GCA' }
 ];
 const ACCOUNT_TYPES = [
     { name: 'Cash', type: client_1.AccountType.CASH },

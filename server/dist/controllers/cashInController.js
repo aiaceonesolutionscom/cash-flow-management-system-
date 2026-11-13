@@ -11,7 +11,7 @@ const client_1 = require("@prisma/client");
 const audit_1 = require("../utils/audit");
 const createCashIn = async (req, res) => {
     try {
-        const { companyId, accountId, categoryId, categoryName, amount, party, paymentDate, referenceNo, description, companyFundId } = req.body;
+        const { companyId, accountId, categoryId, categoryName, amount, party, paymentDate, referenceNo, description, companyFundId, fundAllocations } = req.body;
         if (!companyId || !accountId || (!categoryId && !categoryName) || !amount || !party || !paymentDate) {
             res.status(400).json({ success: false, message: 'All required fields must be provided' });
             return;
@@ -20,6 +20,25 @@ const createCashIn = async (req, res) => {
         if (amountDec.lessThanOrEqualTo(0)) {
             res.status(400).json({ success: false, message: 'Amount must be greater than zero' });
             return;
+        }
+        let parsedAllocations = [];
+        if (fundAllocations) {
+            try {
+                parsedAllocations = typeof fundAllocations === 'string' ? JSON.parse(fundAllocations) : fundAllocations;
+            }
+            catch (e) {
+                console.error('Error parsing fundAllocations', e);
+            }
+        }
+        if (parsedAllocations && parsedAllocations.length > 0) {
+            const totalAllocSum = parsedAllocations.reduce((sum, a) => sum + Number(a.amount), 0);
+            if (Math.abs(totalAllocSum - amountDec.toNumber()) > 0.05) {
+                res.status(400).json({
+                    success: false,
+                    message: `Sum of multi-fund allocations (PKR ${totalAllocSum.toLocaleString()}) does not match total amount (PKR ${amountDec.toNumber().toLocaleString()})`
+                });
+                return;
+            }
         }
         const result = await prisma_1.prisma.$transaction(async (tx) => {
             // 1. Resolve category: search or auto-create to prevent duplicates
@@ -60,7 +79,81 @@ const createCashIn = async (req, res) => {
             if (!account) {
                 throw new Error('Selected account does not belong to the selected company');
             }
-            // 3. If linked to CompanyFund, validate remaining balance & allocate
+            // 3. Multi-fund allocations handling
+            if (parsedAllocations && parsedAllocations.length > 0) {
+                const createdTxs = [];
+                for (let i = 0; i < parsedAllocations.length; i++) {
+                    const alloc = parsedAllocations[i];
+                    const fund = await tx.companyFund.findUnique({ where: { id: alloc.fundId } });
+                    if (!fund) {
+                        throw new Error(`Selected Company Fund not found: ${alloc.fundId}`);
+                    }
+                    const remaining = Number(fund.totalAmount) - Number(fund.allocatedAmount);
+                    if (alloc.amount > remaining + 0.01) {
+                        throw new Error(`Allocation for "${fund.title}" (PKR ${alloc.amount.toLocaleString()}) exceeds remaining available fund balance (PKR ${remaining.toLocaleString()})`);
+                    }
+                    const newAllocated = Number(fund.allocatedAmount) + alloc.amount;
+                    const newStatus = newAllocated >= Number(fund.totalAmount) ? 'FULLY_ALLOCATED' : 'PARTIALLY_ALLOCATED';
+                    await tx.companyFund.update({
+                        where: { id: alloc.fundId },
+                        data: {
+                            allocatedAmount: newAllocated,
+                            status: newStatus
+                        }
+                    });
+                    const subDescription = parsedAllocations.length > 1
+                        ? `${description ? description + ' ' : ''}[Multi-Fund: PKR ${alloc.amount.toLocaleString()} from ${fund.title}]`
+                        : (description?.trim() || null);
+                    const subTx = await tx.transaction.create({
+                        data: {
+                            companyId,
+                            accountId,
+                            categoryId: targetCategoryId,
+                            type: client_1.TransactionType.CASH_IN,
+                            amount: new decimal_js_1.Decimal(alloc.amount),
+                            party: party.trim(),
+                            paymentDate: new Date(paymentDate),
+                            referenceNo: referenceNo?.trim() || null,
+                            description: subDescription,
+                            companyFundId: alloc.fundId,
+                        },
+                        include: {
+                            company: true,
+                            account: true,
+                            category: true,
+                            attachments: true,
+                            companyFund: true
+                        }
+                    });
+                    createdTxs.push(subTx);
+                }
+                // Atomically increase target account balance by total amount
+                await tx.account.update({
+                    where: { id: accountId },
+                    data: {
+                        currentBalance: {
+                            increment: amountDec
+                        }
+                    }
+                });
+                // Handle attachment for the primary transaction
+                if (req.file && createdTxs.length > 0) {
+                    const fileBuffer = req.file.buffer || (req.file.path ? fs_1.default.readFileSync(req.file.path) : null);
+                    await tx.attachment.create({
+                        data: {
+                            transactionId: createdTxs[0].id,
+                            filename: req.file.filename,
+                            originalName: req.file.originalname,
+                            mimeType: req.file.mimetype,
+                            size: req.file.size,
+                            filePath: `/uploads/${req.file.filename}`,
+                            fileData: fileBuffer
+                        }
+                    });
+                }
+                return createdTxs[0];
+            }
+            // 4. Single Fund or Standard Cash In
             let resolvedFundId = null;
             if (companyFundId && typeof companyFundId === 'string' && companyFundId.trim() && companyFundId !== 'none') {
                 resolvedFundId = companyFundId.trim();
@@ -82,7 +175,7 @@ const createCashIn = async (req, res) => {
                     }
                 });
             }
-            // 4. Create transaction record
+            // Create transaction record
             const transaction = await tx.transaction.create({
                 data: {
                     companyId,
@@ -104,7 +197,7 @@ const createCashIn = async (req, res) => {
                     companyFund: true
                 }
             });
-            // 3. Atomically increase target account balance
+            // Atomically increase target account balance
             await tx.account.update({
                 where: { id: accountId },
                 data: {
@@ -113,7 +206,7 @@ const createCashIn = async (req, res) => {
                     }
                 }
             });
-            // 4. Handle attachment if uploaded (saved as bytes in PostgreSQL)
+            // Handle attachment if uploaded
             if (req.file) {
                 const fileBuffer = req.file.buffer || (req.file.path ? fs_1.default.readFileSync(req.file.path) : null);
                 await tx.attachment.create({
