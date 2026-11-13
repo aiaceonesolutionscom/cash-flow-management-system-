@@ -47,8 +47,6 @@ export const getCompanyNotes = async (req: Request, res: Response): Promise<void
         }
       },
       orderBy: [
-        { status: 'asc' }, // PENDING first
-        { dueDate: 'asc' },
         { createdAt: 'desc' }
       ]
     });

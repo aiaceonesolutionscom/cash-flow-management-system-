@@ -42,8 +42,6 @@ const getCompanyNotes = async (req, res) => {
                 }
             },
             orderBy: [
-                { status: 'asc' }, // PENDING first
-                { dueDate: 'asc' },
                 { createdAt: 'desc' }
             ]
         });

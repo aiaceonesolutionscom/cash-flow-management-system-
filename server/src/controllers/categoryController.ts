@@ -30,8 +30,7 @@ export const getCategories = async (req: Request, res: Response): Promise<void> 
         }
       },
       orderBy: [
-        { type: 'asc' },
-        { name: 'asc' }
+        { createdAt: 'desc' }
       ]
     });
 
@@ -111,6 +110,12 @@ export const updateCategory = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const existing = await prisma.category.findUnique({ where: { id } });
+    if (existing && existing.name.toLowerCase().includes('company fund')) {
+      res.status(400).json({ success: false, message: 'Company Funds is a protected system category and cannot be modified.' });
+      return;
+    }
+
     const data: any = { name: name.trim() };
     if (type) data.type = type;
     if (companyId !== undefined) data.companyId = companyId ? companyId : null;
@@ -149,6 +154,11 @@ export const deleteCategory = async (req: Request, res: Response): Promise<void>
 
     if (!category) {
       res.status(404).json({ success: false, message: 'Category not found' });
+      return;
+    }
+
+    if (category.name.toLowerCase().includes('company fund')) {
+      res.status(400).json({ success: false, message: 'Company Funds is a protected system category and cannot be deleted.' });
       return;
     }
 

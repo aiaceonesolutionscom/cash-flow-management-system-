@@ -9,7 +9,7 @@ const getCompanies = async (_req, res) => {
             include: {
                 accounts: true,
             },
-            orderBy: { name: 'asc' }
+            orderBy: { createdAt: 'desc' }
         });
         // Calculate aggregated company metrics
         const results = await Promise.all(companies.map(async (comp) => {
@@ -51,10 +51,10 @@ const getCompanyById = async (req, res) => {
             where: { id },
             include: {
                 accounts: {
-                    orderBy: { name: 'asc' }
+                    orderBy: { createdAt: 'desc' }
                 },
                 categories: {
-                    orderBy: { name: 'asc' }
+                    orderBy: { createdAt: 'desc' }
                 }
             }
         });

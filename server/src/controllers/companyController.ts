@@ -8,7 +8,7 @@ export const getCompanies = async (_req: Request, res: Response): Promise<void> 
       include: {
         accounts: true,
       },
-      orderBy: { name: 'asc' }
+      orderBy: { createdAt: 'desc' }
     });
 
     // Calculate aggregated company metrics
@@ -58,10 +58,10 @@ export const getCompanyById = async (req: Request, res: Response): Promise<void>
       where: { id },
       include: {
         accounts: {
-          orderBy: { name: 'asc' }
+          orderBy: { createdAt: 'desc' }
         },
         categories: {
-          orderBy: { name: 'asc' }
+          orderBy: { createdAt: 'desc' }
         }
       }
     });

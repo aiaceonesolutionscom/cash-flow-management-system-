@@ -44,7 +44,7 @@ const getFunds = async (req, res) => {
                     orderBy: { paymentDate: 'desc' }
                 }
             },
-            orderBy: { fundDate: 'desc' }
+            orderBy: [{ fundDate: 'desc' }, { createdAt: 'desc' }]
         });
         // Summary aggregates
         const allFunds = await prisma_1.prisma.companyFund.findMany();
@@ -103,7 +103,7 @@ const getAvailableFunds = async (_req, res) => {
             where: {
                 status: { in: [client_1.FundStatus.UNALLOCATED, client_1.FundStatus.PARTIALLY_ALLOCATED] }
             },
-            orderBy: { fundDate: 'desc' }
+            orderBy: [{ fundDate: 'desc' }, { createdAt: 'desc' }]
         });
         const available = funds
             .map((f) => {

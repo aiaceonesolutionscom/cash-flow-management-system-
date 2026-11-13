@@ -229,7 +229,7 @@ export const getCashInList = async (req: Request, res: Response): Promise<void> 
             }
           }
         },
-        orderBy: { paymentDate: 'desc' },
+        orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
         skip,
         take: limitNum
       }),

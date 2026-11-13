@@ -161,7 +161,7 @@ export const getTransfers = async (req: Request, res: Response): Promise<void> =
             }
           }
         },
-        orderBy: { transferDate: 'desc' },
+        orderBy: [{ transferDate: 'desc' }, { createdAt: 'desc' }],
         skip,
         take: limitNum
       }),

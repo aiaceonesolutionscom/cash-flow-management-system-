@@ -185,7 +185,7 @@ const getCashOutList = async (req, res) => {
                     category: { select: { id: true, name: true } },
                     attachments: true
                 },
-                orderBy: { paymentDate: 'desc' },
+                orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
                 skip,
                 take: limitNum
             }),

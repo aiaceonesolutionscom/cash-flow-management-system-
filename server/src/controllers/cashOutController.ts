@@ -190,7 +190,7 @@ export const getCashOutList = async (req: Request, res: Response): Promise<void>
           category: { select: { id: true, name: true } },
           attachments: true
         },
-        orderBy: { paymentDate: 'desc' },
+        orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
         skip,
         take: limitNum
       }),

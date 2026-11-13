@@ -219,40 +219,50 @@ export const CategoriesPage: React.FC = () => {
           <>
             {/* Mobile Cards for Categories */}
             <div className="md:hidden divide-y divide-slate-100">
-              {categories.slice((page - 1) * limit, page * limit).map((cat) => (
-                <div key={cat.id} className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
-                  <div className="min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-xs text-slate-900 truncate">{cat.name}</span>
-                      <span className={`px-2 py-0.2 rounded-full text-[9px] font-bold shrink-0 ${
-                        cat.type === 'INCOME' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                      }`}>
-                        {cat.type}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {cat.company ? cat.company.name : 'Global Default'} • <span className="text-slate-600 font-semibold">{cat._count?.transactions || 0} txn</span>
-                    </div>
-                  </div>
+              {categories.slice((page - 1) * limit, page * limit).map((cat) => {
+                const isProtected = cat.name.trim().toLowerCase() === 'company funds' || cat.name.toLowerCase().includes('company fund');
 
-                  <div className="flex items-center space-x-1 shrink-0">
-                    <button
-                      onClick={() => handleOpenEdit(cat)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                      title="Edit Category"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(cat)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                return (
+                  <div key={cat.id} className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-xs text-slate-900 truncate">{cat.name}</span>
+                        <span className={`px-2 py-0.2 rounded-full text-[9px] font-bold shrink-0 ${
+                          cat.type === 'INCOME' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                        }`}>
+                          {cat.type}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {cat.company ? cat.company.name : 'Global Default'} • <span className="text-slate-600 font-semibold">{cat._count?.transactions || 0} txn</span>
+                      </div>
+                    </div>
+
+                    {isProtected ? (
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full shrink-0">
+                        System Default
+                      </span>
+                    ) : (
+                      <div className="flex items-center space-x-1 shrink-0">
+                        <button
+                          onClick={() => handleOpenEdit(cat)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                          title="Edit Category"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(cat)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Desktop Table for Categories */}
@@ -268,42 +278,52 @@ export const CategoriesPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {categories.slice((page - 1) * limit, page * limit).map((cat) => (
-                    <tr key={cat.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 px-4 font-semibold text-slate-900">{cat.name}</td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          cat.type === 'INCOME' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                        }`}>
-                          {cat.type}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600">
-                        {cat.company ? `${cat.company.name}` : 'Global Default'}
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 font-medium">
-                        {cat._count?.transactions || 0} transactions
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center space-x-1">
-                          <button
-                            onClick={() => handleOpenEdit(cat)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                            title="Edit Category"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(cat)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                            title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {categories.slice((page - 1) * limit, page * limit).map((cat) => {
+                    const isProtected = cat.name.trim().toLowerCase() === 'company funds' || cat.name.toLowerCase().includes('company fund');
+
+                    return (
+                      <tr key={cat.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-slate-900">{cat.name}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            cat.type === 'INCOME' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                          }`}>
+                            {cat.type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">
+                          {cat.company ? `${cat.company.name}` : 'Global Default'}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 font-medium">
+                          {cat._count?.transactions || 0} transactions
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {isProtected ? (
+                            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full inline-block">
+                              System Default
+                            </span>
+                          ) : (
+                            <div className="flex items-center justify-center space-x-1">
+                              <button
+                                onClick={() => handleOpenEdit(cat)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                title="Edit Category"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClick(cat)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

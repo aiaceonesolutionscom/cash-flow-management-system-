@@ -28,8 +28,7 @@ const getCategories = async (req, res) => {
                 }
             },
             orderBy: [
-                { type: 'asc' },
-                { name: 'asc' }
+                { createdAt: 'desc' }
             ]
         });
         // When "All Companies" is selected, deduplicate by category name and type
@@ -104,6 +103,11 @@ const updateCategory = async (req, res) => {
             res.status(400).json({ success: false, message: 'Name is required' });
             return;
         }
+        const existing = await prisma_1.prisma.category.findUnique({ where: { id } });
+        if (existing && existing.name.toLowerCase().includes('company fund')) {
+            res.status(400).json({ success: false, message: 'Company Funds is a protected system category and cannot be modified.' });
+            return;
+        }
         const data = { name: name.trim() };
         if (type)
             data.type = type;
@@ -140,6 +144,10 @@ const deleteCategory = async (req, res) => {
         });
         if (!category) {
             res.status(404).json({ success: false, message: 'Category not found' });
+            return;
+        }
+        if (category.name.toLowerCase().includes('company fund')) {
+            res.status(400).json({ success: false, message: 'Company Funds is a protected system category and cannot be deleted.' });
             return;
         }
         if (category._count.transactions > 0) {

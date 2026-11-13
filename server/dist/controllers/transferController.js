@@ -151,7 +151,7 @@ const getTransfers = async (req, res) => {
                         }
                     }
                 },
-                orderBy: { transferDate: 'desc' },
+                orderBy: [{ transferDate: 'desc' }, { createdAt: 'desc' }],
                 skip,
                 take: limitNum
             }),

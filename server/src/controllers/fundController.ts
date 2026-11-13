@@ -42,7 +42,7 @@ export const getFunds = async (req: Request, res: Response): Promise<void> => {
           orderBy: { paymentDate: 'desc' }
         }
       },
-      orderBy: { fundDate: 'desc' }
+      orderBy: [{ fundDate: 'desc' }, { createdAt: 'desc' }]
     });
 
     // Summary aggregates
@@ -106,7 +106,7 @@ export const getAvailableFunds = async (_req: Request, res: Response): Promise<v
       where: {
         status: { in: [FundStatus.UNALLOCATED, FundStatus.PARTIALLY_ALLOCATED] }
       },
-      orderBy: { fundDate: 'desc' }
+      orderBy: [{ fundDate: 'desc' }, { createdAt: 'desc' }]
     });
 
     const available = funds
