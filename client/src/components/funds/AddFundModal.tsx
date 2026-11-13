@@ -125,8 +125,9 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Fund Title / Purpose *
+            <label className="flex items-center text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">
+              <span>Fund Title / Purpose</span>
+              <span className="text-rose-500 font-bold ml-1">*</span>
             </label>
             <input
               type="text"
@@ -140,8 +141,9 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Total Fund Amount (PKR) *
+              <label className="flex items-center text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1 whitespace-nowrap">
+                <span>Total Fund Amount (PKR)</span>
+                <span className="text-rose-500 font-bold ml-1">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">₨</span>
@@ -158,8 +160,9 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Fund Date *
+              <label className="flex items-center text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">
+                <span>Fund Date</span>
+                <span className="text-rose-500 font-bold ml-1">*</span>
               </label>
               <input
                 type="date"
@@ -173,8 +176,9 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Received From (Person / Party) *
+              <label className="flex items-center text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1 whitespace-nowrap">
+                <span>Received From (Person / Party)</span>
+                <span className="text-rose-500 font-bold ml-1">*</span>
               </label>
               <input
                 type="text"
@@ -187,8 +191,8 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Receiving Account / Mode
+              <label className="flex items-center text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">
+                <span>Receiving Account / Mode</span>
               </label>
               <input
                 type="text"
