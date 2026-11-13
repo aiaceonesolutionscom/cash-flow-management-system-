@@ -23,12 +23,14 @@ import { CompanyFund, FundsSummary, FundStatus, Company } from '../types';
 import { AddFundModal } from '../components/funds/AddFundModal';
 import { AttachmentViewerModal } from '../components/modals/AttachmentViewerModal';
 import { CashInModal } from '../components/modals/CashInModal';
+import { useFilters } from '../context/FilterContext';
 
 interface FundsPageProps {
   companies: Company[];
 }
 
 export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
+  const { refreshTrigger, triggerRefresh } = useFilters();
   const [funds, setFunds] = useState<CompanyFund[]>([]);
   const [summary, setSummary] = useState<FundsSummary>({
     totalFundsReceived: 0,
@@ -83,7 +85,7 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
 
   useEffect(() => {
     loadFunds();
-  }, [statusFilter]);
+  }, [statusFilter, refreshTrigger]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +109,7 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
     try {
       const res = await api.delete(`/funds/${fund.id}`);
       if (res.data.success) {
+        triggerRefresh();
         loadFunds();
       }
     } catch (err: any) {
@@ -165,7 +168,10 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
 
         <div className="flex items-center space-x-2.5 self-start sm:self-auto">
           <button
-            onClick={loadFunds}
+            onClick={() => {
+              triggerRefresh();
+              loadFunds();
+            }}
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors flex items-center space-x-1.5 text-xs font-semibold cursor-pointer"
             title="Refresh Pool"
           >
@@ -516,6 +522,7 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={() => {
           setIsAddModalOpen(false);
+          triggerRefresh();
           loadFunds();
         }}
       />
@@ -528,6 +535,7 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
           onClose={() => setEditingFund(null)}
           onSuccess={() => {
             setEditingFund(null);
+            triggerRefresh();
             loadFunds();
           }}
         />
@@ -553,6 +561,7 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
           onSuccess={() => {
             setIsCashInModalOpen(false);
             setDistributeFundId(null);
+            triggerRefresh();
             loadFunds();
           }}
           companies={companies}
