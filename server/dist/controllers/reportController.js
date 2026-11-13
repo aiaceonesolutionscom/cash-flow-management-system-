@@ -131,20 +131,95 @@ const getFinancialReport = async (req, res) => {
             return;
         }
         // 2. DEDICATED REPORT: Company Funds Statement
-        const isFundsReport = reportType === 'company_funds';
-        const where = await buildReportWhere(req.query);
-        if (isFundsReport) {
-            where.type = client_1.TransactionType.CASH_IN;
-            where.category = {
-                name: { contains: 'Fund', mode: 'insensitive' }
-            };
+        if (reportType === 'company_funds') {
+            const { status, startDate, endDate, search } = req.query;
+            const fundWhere = {};
+            if (status && status !== 'all') {
+                fundWhere.status = status;
+            }
+            if (startDate || endDate) {
+                fundWhere.fundDate = {};
+                if (startDate)
+                    fundWhere.fundDate.gte = new Date(startDate);
+                if (endDate)
+                    fundWhere.fundDate.lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+            }
+            if (search) {
+                fundWhere.OR = [
+                    { title: { contains: search, mode: 'insensitive' } },
+                    { receivedFrom: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } },
+                    { receivingMethod: { contains: search, mode: 'insensitive' } }
+                ];
+            }
+            const rawFunds = await prisma_1.prisma.companyFund.findMany({
+                where: fundWhere,
+                include: {
+                    transactions: {
+                        include: {
+                            company: { select: { id: true, name: true, code: true } },
+                            account: { select: { id: true, name: true, type: true } }
+                        },
+                        orderBy: { paymentDate: 'desc' }
+                    }
+                },
+                orderBy: { fundDate: 'desc' }
+            });
+            let totalInjected = new decimal_js_1.Decimal(0);
+            let totalAllocated = new decimal_js_1.Decimal(0);
+            let totalRemaining = new decimal_js_1.Decimal(0);
+            const funds = rawFunds.map((f) => {
+                const tot = new decimal_js_1.Decimal(f.totalAmount.toString());
+                const alloc = new decimal_js_1.Decimal(f.allocatedAmount.toString());
+                const rem = tot.minus(alloc);
+                totalInjected = totalInjected.plus(tot);
+                totalAllocated = totalAllocated.plus(alloc);
+                totalRemaining = totalRemaining.plus(rem);
+                return {
+                    id: f.id,
+                    title: f.title,
+                    description: f.description,
+                    totalAmount: tot.toFixed(2),
+                    allocatedAmount: alloc.toFixed(2),
+                    remainingAmount: rem.toFixed(2),
+                    receivedFrom: f.receivedFrom,
+                    receivingMethod: f.receivingMethod,
+                    fundDate: f.fundDate,
+                    status: f.status,
+                    attachmentUrl: f.attachmentUrl,
+                    attachmentName: f.attachmentName,
+                    allocations: f.transactions.map((tx) => ({
+                        id: tx.id,
+                        companyName: tx.company.name,
+                        accountName: tx.account.name,
+                        amount: Number(tx.amount).toFixed(2),
+                        paymentDate: tx.paymentDate,
+                        referenceNo: tx.referenceNo,
+                        description: tx.description
+                    }))
+                };
+            });
+            res.json({
+                success: true,
+                reportType: 'company_funds',
+                summary: {
+                    totalFundsInjected: totalInjected.toFixed(2),
+                    totalAllocated: totalAllocated.toFixed(2),
+                    remainingBalance: totalRemaining.toFixed(2),
+                    totalCount: funds.length
+                },
+                funds
+            });
+            return;
         }
+        const where = await buildReportWhere(req.query);
         const transactions = await prisma_1.prisma.transaction.findMany({
             where,
             include: {
                 company: { select: { id: true, name: true, code: true } },
                 account: { select: { id: true, name: true, type: true } },
                 category: { select: { id: true, name: true, type: true } },
+                companyFund: { select: { id: true, title: true, receivedFrom: true } },
                 attachments: { select: { id: true, originalName: true, mimeType: true } }
             },
             orderBy: { paymentDate: 'desc' }
@@ -310,19 +385,152 @@ const exportReportExcel = async (req, res) => {
             res.end();
             return;
         }
-        const where = await buildReportWhere(req.query);
+        // Dedicated Excel Export for Company Funds Statement
         if (reportType === 'company_funds') {
-            where.type = client_1.TransactionType.CASH_IN;
-            where.category = {
-                name: { contains: 'Fund', mode: 'insensitive' }
+            const { status, startDate, endDate, search } = req.query;
+            const fundWhere = {};
+            if (status && status !== 'all')
+                fundWhere.status = status;
+            if (startDate || endDate) {
+                fundWhere.fundDate = {};
+                if (startDate)
+                    fundWhere.fundDate.gte = new Date(startDate);
+                if (endDate)
+                    fundWhere.fundDate.lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+            }
+            if (search) {
+                fundWhere.OR = [
+                    { title: { contains: search, mode: 'insensitive' } },
+                    { receivedFrom: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } },
+                    { receivingMethod: { contains: search, mode: 'insensitive' } }
+                ];
+            }
+            const funds = await prisma_1.prisma.companyFund.findMany({
+                where: fundWhere,
+                include: {
+                    transactions: {
+                        include: {
+                            company: true,
+                            account: true
+                        },
+                        orderBy: { paymentDate: 'desc' }
+                    }
+                },
+                orderBy: { fundDate: 'desc' }
+            });
+            const workbook = new exceljs_1.default.Workbook();
+            workbook.creator = 'CASHFLOW Financial Management System';
+            workbook.created = new Date();
+            // Sheet 1: Master Capital Inflows
+            const sheet = workbook.addWorksheet('Central Funds Pool');
+            sheet.columns = [
+                { header: 'Date', key: 'date', width: 14 },
+                { header: 'Fund Title', key: 'title', width: 28 },
+                { header: 'Investor / Source', key: 'receivedFrom', width: 26 },
+                { header: 'Receiving Method', key: 'receivingMethod', width: 20 },
+                { header: 'Total Inflow (PKR)', key: 'totalAmount', width: 20 },
+                { header: 'Allocated to Companies (PKR)', key: 'allocatedAmount', width: 24 },
+                { header: 'Remaining Balance (PKR)', key: 'remainingAmount', width: 22 },
+                { header: 'Status', key: 'status', width: 18 },
+                { header: 'Allocations Count', key: 'allocCount', width: 16 }
+            ];
+            const headerRow = sheet.getRow(1);
+            headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            headerRow.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF1E40AF' }
             };
+            headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+            headerRow.height = 26;
+            let totalInjected = 0;
+            let totalAllocated = 0;
+            let totalRemaining = 0;
+            funds.forEach((f) => {
+                const tot = Number(f.totalAmount);
+                const alloc = Number(f.allocatedAmount);
+                const rem = tot - alloc;
+                totalInjected += tot;
+                totalAllocated += alloc;
+                totalRemaining += rem;
+                const row = sheet.addRow({
+                    date: (0, date_fns_1.format)(f.fundDate, 'yyyy-MM-dd'),
+                    title: f.title,
+                    receivedFrom: f.receivedFrom,
+                    receivingMethod: f.receivingMethod || '—',
+                    totalAmount: tot,
+                    allocatedAmount: alloc,
+                    remainingAmount: rem,
+                    status: f.status,
+                    allocCount: f.transactions.length
+                });
+                row.getCell('totalAmount').numFmt = '#,##0.00';
+                row.getCell('allocatedAmount').numFmt = '#,##0.00';
+                row.getCell('remainingAmount').numFmt = '#,##0.00';
+                row.getCell('remainingAmount').font = { bold: true, color: { argb: 'FF1E40AF' } };
+            });
+            sheet.addRow({});
+            const summaryRow = sheet.addRow({
+                receivedFrom: 'TOTAL SUMMARY',
+                totalAmount: totalInjected,
+                allocatedAmount: totalAllocated,
+                remainingAmount: totalRemaining
+            });
+            summaryRow.font = { bold: true };
+            summaryRow.getCell('totalAmount').numFmt = '#,##0.00';
+            summaryRow.getCell('allocatedAmount').numFmt = '#,##0.00';
+            summaryRow.getCell('remainingAmount').numFmt = '#,##0.00';
+            summaryRow.getCell('remainingAmount').font = { color: { argb: 'FF059669' }, bold: true };
+            // Sheet 2: Allocations Breakdown
+            const allocSheet = workbook.addWorksheet('Company Allocations');
+            allocSheet.columns = [
+                { header: 'Allocation Date', key: 'date', width: 14 },
+                { header: 'Fund Title', key: 'fundTitle', width: 28 },
+                { header: 'Receiving Company', key: 'company', width: 26 },
+                { header: 'Receiving Account', key: 'account', width: 20 },
+                { header: 'Allocated Amount (PKR)', key: 'amount', width: 22 },
+                { header: 'Reference #', key: 'ref', width: 18 },
+                { header: 'Description / Notes', key: 'notes', width: 30 }
+            ];
+            const allocHeader = allocSheet.getRow(1);
+            allocHeader.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            allocHeader.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF059669' }
+            };
+            allocHeader.alignment = { vertical: 'middle', horizontal: 'center' };
+            allocHeader.height = 26;
+            funds.forEach((f) => {
+                f.transactions.forEach((tx) => {
+                    const row = allocSheet.addRow({
+                        date: (0, date_fns_1.format)(tx.paymentDate, 'yyyy-MM-dd'),
+                        fundTitle: f.title,
+                        company: tx.company.name,
+                        account: tx.account.name,
+                        amount: Number(tx.amount),
+                        ref: tx.referenceNo || '—',
+                        notes: tx.description || '—'
+                    });
+                    row.getCell('amount').numFmt = '#,##0.00';
+                    row.getCell('amount').font = { bold: true, color: { argb: 'FF059669' } };
+                });
+            });
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=Company_Funds_Statement_${(0, date_fns_1.format)(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
+            await workbook.xlsx.write(res);
+            res.end();
+            return;
         }
+        const where = await buildReportWhere(req.query);
         const transactions = await prisma_1.prisma.transaction.findMany({
             where,
             include: {
                 company: true,
                 account: true,
-                category: true
+                category: true,
+                companyFund: true
             },
             orderBy: { paymentDate: 'desc' }
         });
@@ -518,18 +726,143 @@ const exportReportPDF = async (req, res) => {
             doc.end();
             return;
         }
-        const isFundsReport = reportType === 'company_funds';
-        const where = await buildReportWhere(req.query);
-        if (isFundsReport) {
-            where.type = client_1.TransactionType.CASH_IN;
-            where.category = {
-                name: { contains: 'Fund', mode: 'insensitive' }
+        // Dedicated PDF Export for Company Funds Statement
+        if (reportType === 'company_funds') {
+            const { status, startDate, endDate, search } = req.query;
+            const fundWhere = {};
+            if (status && status !== 'all')
+                fundWhere.status = status;
+            if (startDate || endDate) {
+                fundWhere.fundDate = {};
+                if (startDate)
+                    fundWhere.fundDate.gte = new Date(startDate);
+                if (endDate)
+                    fundWhere.fundDate.lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+            }
+            if (search) {
+                fundWhere.OR = [
+                    { title: { contains: search, mode: 'insensitive' } },
+                    { receivedFrom: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } },
+                    { receivingMethod: { contains: search, mode: 'insensitive' } }
+                ];
+            }
+            const funds = await prisma_1.prisma.companyFund.findMany({
+                where: fundWhere,
+                include: {
+                    transactions: {
+                        include: { company: true, account: true },
+                        orderBy: { paymentDate: 'desc' }
+                    }
+                },
+                orderBy: { fundDate: 'desc' }
+            });
+            let totalInjected = 0;
+            let totalAllocated = 0;
+            let totalRemaining = 0;
+            funds.forEach((f) => {
+                const tot = Number(f.totalAmount);
+                const alloc = Number(f.allocatedAmount);
+                const rem = tot - alloc;
+                totalInjected += tot;
+                totalAllocated += alloc;
+                totalRemaining += rem;
+            });
+            const doc = new pdfkit_1.default({
+                size: 'A4',
+                layout: 'landscape',
+                margin: 36,
+                bufferPages: true
+            });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=Company_Funds_Statement_${(0, date_fns_1.format)(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
+            doc.pipe(res);
+            const pageWidth = doc.page.width;
+            const contentWidth = pageWidth - 72;
+            const drawFundHeader = (y) => {
+                doc.rect(36, y, contentWidth, 20).fill('#1e40af');
+                doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
+                doc.text('Date', 42, y + 5, { width: 65 });
+                doc.text('Fund Title', 112, y + 5, { width: 130 });
+                doc.text('Source / Investor', 248, y + 5, { width: 110 });
+                doc.text('Payment Method', 364, y + 5, { width: 95 });
+                doc.text('Status', 465, y + 5, { width: 85 });
+                doc.text('Allocated (PKR)', 555, y + 5, { width: 75, align: 'right' });
+                doc.text('Remaining (PKR)', 635, y + 5, { width: 75, align: 'right' });
+                doc.text('Total Fund (PKR)', 715, y + 5, { width: 83, align: 'right' });
             };
+            // Title
+            doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold').text('CASHFLOW FINANCIAL MANAGEMENT SYSTEM', 36, 32);
+            doc.fontSize(10).font('Helvetica').fillColor('#64748b').text(`Central Funds Pool & Multi-Company Allocations Statement  •  Generated: ${(0, date_fns_1.format)(new Date(), 'dd MMMM yyyy, hh:mm a')}`, 36, 52);
+            // KPI Cards
+            const kpiY = 70;
+            const cardWidth = (contentWidth - 24) / 4;
+            // Card 1: Total Injected
+            doc.rect(36, kpiY, cardWidth, 42).fillAndStroke('#eff6ff', '#bfdbfe');
+            doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold').text('TOTAL FUNDS INJECTED', 44, kpiY + 8);
+            doc.fillColor('#2563eb').fontSize(11).font('Helvetica-Bold').text(`PKR ${totalInjected.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 44, kpiY + 22);
+            // Card 2: Distributed to Companies
+            doc.rect(36 + cardWidth + 8, kpiY, cardWidth, 42).fillAndStroke('#ecfdf5', '#a7f3d0');
+            doc.fillColor('#065f46').fontSize(8).font('Helvetica-Bold').text('DISTRIBUTED TO COMPANIES', 36 + cardWidth + 16, kpiY + 8);
+            doc.fillColor('#059669').fontSize(11).font('Helvetica-Bold').text(`PKR ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 36 + cardWidth + 16, kpiY + 22);
+            // Card 3: Remaining Pool Balance
+            doc.rect(36 + (cardWidth + 8) * 2, kpiY, cardWidth, 42).fillAndStroke('#eff6ff', '#bfdbfe');
+            doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold').text('REMAINING AVAILABLE POOL', 36 + (cardWidth + 8) * 2 + 8, kpiY + 8);
+            doc.fillColor('#1e40af').fontSize(11).font('Helvetica-Bold').text(`PKR ${totalRemaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 36 + (cardWidth + 8) * 2 + 8, kpiY + 22);
+            // Card 4: Total Inflows Count
+            doc.rect(36 + (cardWidth + 8) * 3, kpiY, cardWidth, 42).fillAndStroke('#f8fafc', '#e2e8f0');
+            doc.fillColor('#475569').fontSize(8).font('Helvetica-Bold').text('TOTAL INFLOW FUNDS', 36 + (cardWidth + 8) * 3 + 8, kpiY + 8);
+            doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text(`${funds.length} Inflow Funds`, 36 + (cardWidth + 8) * 3 + 8, kpiY + 22);
+            let currentY = 126;
+            drawFundHeader(currentY);
+            currentY += 20;
+            doc.font('Helvetica').fontSize(8);
+            funds.forEach((f, idx) => {
+                if (currentY > 510) {
+                    doc.addPage();
+                    currentY = 36;
+                    drawFundHeader(currentY);
+                    currentY += 20;
+                    doc.font('Helvetica').fontSize(8);
+                }
+                if (idx % 2 === 0) {
+                    doc.rect(36, currentY, contentWidth, 20).fill('#f8fafc');
+                }
+                doc.fillColor('#334155');
+                doc.text((0, date_fns_1.format)(f.fundDate, 'yyyy-MM-dd'), 42, currentY + 5, { width: 65 });
+                doc.font('Helvetica-Bold').text(f.title.slice(0, 24), 112, currentY + 5, { width: 130 });
+                doc.font('Helvetica').text(f.receivedFrom.slice(0, 20), 248, currentY + 5, { width: 110 });
+                doc.text((f.receivingMethod || '—').slice(0, 16), 364, currentY + 5, { width: 95 });
+                // Status
+                doc.font('Helvetica-Bold').fillColor(f.status === 'FULLY_ALLOCATED' ? '#059669' : f.status === 'PARTIALLY_ALLOCATED' ? '#d97706' : '#2563eb');
+                doc.text(f.status, 465, currentY + 5, { width: 85 });
+                // Numbers
+                const tot = Number(f.totalAmount);
+                const alloc = Number(f.allocatedAmount);
+                const rem = tot - alloc;
+                doc.font('Helvetica').fillColor('#059669').text(alloc.toLocaleString('en-US', { minimumFractionDigits: 2 }), 555, currentY + 5, { width: 75, align: 'right' });
+                doc.fillColor('#1e40af').text(rem.toLocaleString('en-US', { minimumFractionDigits: 2 }), 635, currentY + 5, { width: 75, align: 'right' });
+                doc.font('Helvetica-Bold').fillColor('#0f172a').text(tot.toLocaleString('en-US', { minimumFractionDigits: 2 }), 715, currentY + 5, { width: 83, align: 'right' });
+                currentY += 20;
+            });
+            const range = doc.bufferedPageRange();
+            for (let i = 0; i < range.count; i++) {
+                doc.switchToPage(i);
+                doc.fontSize(8).fillColor('#94a3b8').text(`Page ${i + 1} of ${range.count}   •   CASHFLOW Financial Suite   •   Company Funds Statement`, 36, doc.page.height - 24, { align: 'center', width: contentWidth });
+            }
+            doc.end();
+            return;
         }
+        const where = await buildReportWhere(req.query);
         // Fetch COMPLETE transactions dataset (no arbitrary limit!)
         const transactions = await prisma_1.prisma.transaction.findMany({
             where,
-            include: { company: true, account: true, category: true },
+            include: {
+                company: true,
+                account: true,
+                category: true,
+                companyFund: true
+            },
             orderBy: { paymentDate: 'desc' }
         });
         let totalIn = new decimal_js_1.Decimal(0);
@@ -549,7 +882,7 @@ const exportReportPDF = async (req, res) => {
             bufferPages: true
         });
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=${isFundsReport ? 'Company_Funds_Statement' : 'Financial_Statement'}_${(0, date_fns_1.format)(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
+        res.setHeader('Content-Disposition', `attachment; filename=Financial_Statement_${(0, date_fns_1.format)(new Date(), 'yyyyMMdd_HHmmss')}.pdf`);
         doc.pipe(res);
         const pageWidth = doc.page.width;
         const contentWidth = pageWidth - 72; // 770 pt
@@ -568,13 +901,13 @@ const exportReportPDF = async (req, res) => {
         };
         // Header Title
         doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold').text('CASHFLOW FINANCIAL MANAGEMENT SYSTEM', 36, 32);
-        doc.fontSize(10).font('Helvetica').fillColor('#64748b').text(`${isFundsReport ? 'Company Funds Injection Statement' : 'Executive Financial Statement'}  •  Generated: ${(0, date_fns_1.format)(new Date(), 'dd MMMM yyyy, hh:mm a')}`, 36, 52);
+        doc.fontSize(10).font('Helvetica').fillColor('#64748b').text(`Executive Financial Statement  •  Generated: ${(0, date_fns_1.format)(new Date(), 'dd MMMM yyyy, hh:mm a')}`, 36, 52);
         // 4 KPI Summary Cards
         const kpiY = 70;
         const cardWidth = (contentWidth - 24) / 4;
-        // Card 1: Inflow / Funds Injected
+        // Card 1: Inflow
         doc.rect(36, kpiY, cardWidth, 42).fillAndStroke('#ecfdf5', '#a7f3d0');
-        doc.fillColor('#065f46').fontSize(8).font('Helvetica-Bold').text(isFundsReport ? 'TOTAL FUNDS INJECTED' : 'TOTAL INFLOW', 44, kpiY + 8);
+        doc.fillColor('#065f46').fontSize(8).font('Helvetica-Bold').text('TOTAL INFLOW', 44, kpiY + 8);
         doc.fillColor('#059669').fontSize(11).font('Helvetica-Bold').text(`+PKR ${Number(totalIn).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 44, kpiY + 22);
         // Card 2: Outflow
         doc.rect(36 + cardWidth + 8, kpiY, cardWidth, 42).fillAndStroke('#fff1f2', '#fecdd3');
@@ -673,24 +1006,66 @@ const exportReportCSV = async (req, res) => {
             res.send(csv);
             return;
         }
-        const isFundsReport = reportType === 'company_funds';
-        const where = await buildReportWhere(req.query);
-        if (isFundsReport) {
-            where.type = client_1.TransactionType.CASH_IN;
-            where.category = {
-                name: { contains: 'Fund', mode: 'insensitive' }
-            };
+        if (reportType === 'company_funds') {
+            const { status, startDate, endDate, search } = req.query;
+            const fundWhere = {};
+            if (status && status !== 'all')
+                fundWhere.status = status;
+            if (startDate || endDate) {
+                fundWhere.fundDate = {};
+                if (startDate)
+                    fundWhere.fundDate.gte = new Date(startDate);
+                if (endDate)
+                    fundWhere.fundDate.lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+            }
+            if (search) {
+                fundWhere.OR = [
+                    { title: { contains: search, mode: 'insensitive' } },
+                    { receivedFrom: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } },
+                    { receivingMethod: { contains: search, mode: 'insensitive' } }
+                ];
+            }
+            const funds = await prisma_1.prisma.companyFund.findMany({
+                where: fundWhere,
+                include: {
+                    transactions: {
+                        include: { company: true, account: true },
+                        orderBy: { paymentDate: 'desc' }
+                    }
+                },
+                orderBy: { fundDate: 'desc' }
+            });
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', `attachment; filename=Company_Funds_Statement_${(0, date_fns_1.format)(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+            let csv = 'Fund ID,Date,Fund Title,Investor/Source,Payment Method,Total Inflow (PKR),Allocated to Companies (PKR),Remaining Pool (PKR),Status,Company Allocations Breakdown\n';
+            funds.forEach((f) => {
+                const tot = Number(f.totalAmount);
+                const alloc = Number(f.allocatedAmount);
+                const rem = tot - alloc;
+                const allocSummary = f.transactions.map((a) => `${a.company.name} (${a.account.name}): PKR ${a.amount}`).join('; ');
+                csv += `"${f.id}","${(0, date_fns_1.format)(f.fundDate, 'yyyy-MM-dd')}","${f.title.replace(/"/g, '""')}","${f.receivedFrom.replace(/"/g, '""')}","${(f.receivingMethod || '').replace(/"/g, '""')}",${tot},${alloc},${rem},"${f.status}","${allocSummary.replace(/"/g, '""')}"\n`;
+            });
+            res.send(csv);
+            return;
         }
+        const where = await buildReportWhere(req.query);
         const transactions = await prisma_1.prisma.transaction.findMany({
             where,
-            include: { company: true, account: true, category: true },
+            include: {
+                company: true,
+                account: true,
+                category: true,
+                companyFund: true
+            },
             orderBy: { paymentDate: 'desc' }
         });
         res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=${isFundsReport ? 'Company_Funds_Statement' : 'CashFlow_Ledger'}_${(0, date_fns_1.format)(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
-        let csv = 'Transaction ID,Date,Company,Type,Category,Party/Vendor,Payment Account,Amount (PKR),Reference,Description\n';
+        res.setHeader('Content-Disposition', `attachment; filename=CashFlow_Ledger_${(0, date_fns_1.format)(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+        let csv = 'Transaction ID,Date,Company,Type,Category,Party/Vendor,Payment Account,Amount (PKR),Fund Source,Reference,Description\n';
         transactions.forEach((tx) => {
-            csv += `"${tx.id}","${(0, date_fns_1.format)(tx.paymentDate, 'yyyy-MM-dd')}","${tx.company.name}","${tx.type}","${tx.category.name}","${tx.party.replace(/"/g, '""')}","${tx.account.name}",${tx.amount},"${(tx.referenceNo || '').replace(/"/g, '""')}","${(tx.description || '').replace(/"/g, '""')}"\n`;
+            const fundName = tx.companyFund ? tx.companyFund.title : '';
+            csv += `"${tx.id}","${(0, date_fns_1.format)(tx.paymentDate, 'yyyy-MM-dd')}","${tx.company.name}","${tx.type}","${tx.category.name}","${tx.party.replace(/"/g, '""')}","${tx.account.name}",${tx.amount},"${fundName.replace(/"/g, '""')}","${(tx.referenceNo || '').replace(/"/g, '""')}","${(tx.description || '').replace(/"/g, '""')}"\n`;
         });
         res.send(csv);
     }

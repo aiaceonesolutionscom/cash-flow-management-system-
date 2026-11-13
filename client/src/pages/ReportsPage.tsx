@@ -24,6 +24,7 @@ export const ReportsPage: React.FC = () => {
   const [accountType, setAccountType] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [txTypeFilter, setTxTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [reportData, setReportData] = useState<any>(null);
@@ -108,6 +109,7 @@ export const ReportsPage: React.FC = () => {
         accountType: accountType !== 'all' ? accountType : undefined,
         categoryId: categoryFilter !== 'all' ? categoryFilter : undefined,
         type: txTypeFilter !== 'all' ? txTypeFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
         search: searchTerm.trim() || undefined
       };
       const res = await api.get('/reports', { params });
@@ -123,7 +125,7 @@ export const ReportsPage: React.FC = () => {
 
   useEffect(() => {
     fetchReport();
-  }, [reportType, selectedCompanyId, startDate, endDate, accountType, categoryFilter, txTypeFilter, refreshTrigger]);
+  }, [reportType, selectedCompanyId, startDate, endDate, accountType, categoryFilter, txTypeFilter, statusFilter, refreshTrigger]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +137,7 @@ export const ReportsPage: React.FC = () => {
     setAccountType('all');
     setCategoryFilter('all');
     setTxTypeFilter('all');
+    setStatusFilter('all');
     setSearchTerm('');
   };
 
@@ -148,6 +151,7 @@ export const ReportsPage: React.FC = () => {
     if (accountType !== 'all') params.append('accountType', accountType);
     if (categoryFilter !== 'all') params.append('categoryId', categoryFilter);
     if (txTypeFilter !== 'all') params.append('type', txTypeFilter);
+    if (statusFilter !== 'all') params.append('status', statusFilter);
     if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
     const token = localStorage.getItem('cashflow_token');
@@ -267,49 +271,69 @@ export const ReportsPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Payment Type */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Payment Method</label>
-            <select
-              value={accountType}
-              onChange={(e) => setAccountType(e.target.value)}
-              className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-semibold cursor-pointer"
-            >
-              <option value="all">All Payment Types</option>
-              <option value="CASH">💵 Cash</option>
-              <option value="BANK">🏦 Bank</option>
-              <option value="WALLET">📱 Wallet</option>
-            </select>
-          </div>
+          {reportType === 'company_funds' ? (
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fund Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-semibold cursor-pointer"
+              >
+                <option value="all">All Fund Statuses</option>
+                <option value="UNALLOCATED">🔵 Unallocated</option>
+                <option value="PARTIALLY_ALLOCATED">🟠 Partially Allocated</option>
+                <option value="FULLY_ALLOCATED">🟢 Fully Allocated</option>
+              </select>
+            </div>
+          ) : (
+            <>
+              {/* Payment Type */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Payment Method</label>
+                <select
+                  value={accountType}
+                  onChange={(e) => setAccountType(e.target.value)}
+                  className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-semibold cursor-pointer"
+                >
+                  <option value="all">All Payment Types</option>
+                  <option value="CASH">💵 Cash</option>
+                  <option value="BANK">🏦 Bank</option>
+                  <option value="WALLET">📱 Wallet</option>
+                </select>
+              </div>
 
-          {/* Category Filter */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 cursor-pointer"
-            >
-              <option value="all">All Categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+              {/* Category Filter */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 cursor-pointer"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
-          {/* Transaction Type */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Transaction Type</label>
-            <select
-              value={txTypeFilter}
-              onChange={(e) => setTxTypeFilter(e.target.value)}
-              className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 cursor-pointer"
-            >
-              <option value="all">All Flow Types</option>
-              <option value="CASH_IN">Cash In (+ Inflow)</option>
-              <option value="CASH_OUT">Cash Out (- Outflow)</option>
-            </select>
-          </div>
+          {/* Transaction Type / Status */}
+          {reportType !== 'company_funds' && (
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Transaction Type</label>
+              <select
+                value={txTypeFilter}
+                onChange={(e) => setTxTypeFilter(e.target.value)}
+                className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 cursor-pointer"
+              >
+                <option value="all">All Flow Types</option>
+                <option value="CASH_IN">Cash In (+ Inflow)</option>
+                <option value="CASH_OUT">Cash Out (- Outflow)</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Custom Date Pickers & Search Bar Row */}
@@ -400,18 +424,48 @@ export const ReportsPage: React.FC = () => {
             <div className="text-[11px] text-slate-400 mt-1">Itemized budget records</div>
           </div>
         </div>
+      ) : reportData && reportType === 'company_funds' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Funds Injected</span>
+            <div className="text-xl font-bold text-blue-600 tabular-nums mt-1">
+              {formatPKR(reportData.summary?.totalFundsInjected)}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">Capital from external investors</div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Distributed to Companies</span>
+            <div className="text-xl font-bold text-emerald-600 tabular-nums mt-1">
+              {formatPKR(reportData.summary?.totalAllocated)}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">Allocated into company accounts</div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Remaining Available Pool</span>
+            <div className="text-xl font-bold text-blue-800 tabular-nums mt-1">
+              {formatPKR(reportData.summary?.remainingBalance)}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">🟢 Unspent pool balance</div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Inflow Funds</span>
+            <div className="text-xl font-bold text-slate-900 tabular-nums mt-1">
+              {reportData.summary?.totalCount || 0} Inflow Funds
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">Master capital records</div>
+          </div>
+        </div>
       ) : reportData && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              {reportType === 'company_funds' ? 'Funds Injected' : 'Statement Cash In'}
-            </span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Statement Cash In</span>
             <div className="text-xl font-bold text-emerald-600 tabular-nums mt-1">
               +{formatPKR(reportData.summary?.totalCashIn)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">
-              {reportType === 'company_funds' ? 'Total capital injected' : 'Total incoming payments'}
-            </div>
+            <div className="text-[11px] text-slate-400 mt-1">Total incoming payments</div>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -542,6 +596,89 @@ export const ReportsPage: React.FC = () => {
                               {formatPKR(n.totalAmount)}
                             </td>
                           </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : reportType === 'company_funds' ? (
+              <div className="p-4 space-y-4">
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-left text-xs min-w-[760px]">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-4">Fund Title</th>
+                        <th className="py-3 px-4">Received From</th>
+                        <th className="py-3 px-4">Receiving Method</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Allocated (PKR)</th>
+                        <th className="py-3 px-4 text-right">Remaining (PKR)</th>
+                        <th className="py-3 px-4 text-right">Total Fund (PKR)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {reportData.funds?.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-xs text-slate-400">
+                            No company funds found matching the filters.
+                          </td>
+                        </tr>
+                      ) : (
+                        reportData.funds?.map((f: any) => (
+                          <React.Fragment key={f.id}>
+                            <tr className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                                {format(new Date(f.fundDate), 'dd MMM yyyy')}
+                              </td>
+                              <td className="py-3 px-4 font-bold text-slate-900">
+                                {f.title}
+                                {f.description && (
+                                  <div className="text-[10px] text-slate-400 font-normal truncate max-w-xs">{f.description}</div>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 font-medium text-slate-700 whitespace-nowrap">{f.receivedFrom}</td>
+                              <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{f.receivingMethod || '—'}</td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  f.status === 'FULLY_ALLOCATED' ? 'bg-emerald-50 text-emerald-700' :
+                                  f.status === 'PARTIALLY_ALLOCATED' ? 'bg-amber-50 text-amber-700' :
+                                  'bg-blue-50 text-blue-700'
+                                }`}>
+                                  {f.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-medium text-emerald-600 tabular-nums whitespace-nowrap">
+                                {formatPKR(f.allocatedAmount)}
+                              </td>
+                              <td className="py-3 px-4 text-right font-bold text-blue-700 tabular-nums whitespace-nowrap">
+                                {formatPKR(f.remainingAmount)}
+                              </td>
+                              <td className="py-3 px-4 text-right font-black text-slate-900 tabular-nums whitespace-nowrap">
+                                {formatPKR(f.totalAmount)}
+                              </td>
+                            </tr>
+                            {f.allocations && f.allocations.length > 0 && (
+                              <tr className="bg-slate-50/60">
+                                <td colSpan={8} className="py-2.5 px-6">
+                                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    Allocations to Companies:
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {f.allocations.map((a: any) => (
+                                      <div key={a.id} className="inline-flex items-center space-x-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px]">
+                                        <span className="font-bold text-slate-800">{a.companyName}</span>
+                                        <span className="text-slate-400">({a.accountName})</span>
+                                        <span className="font-extrabold text-emerald-600">PKR {Number(a.amount).toLocaleString()}</span>
+                                        <span className="text-slate-400 text-[10px]">• {format(new Date(a.paymentDate), 'dd MMM')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         ))
                       )}
                     </tbody>
@@ -727,7 +864,14 @@ export const ReportsPage: React.FC = () => {
                               </span>
                             </td>
                             <td className="py-3 px-4 text-slate-600">{tx.category.name}</td>
-                            <td className="py-3 px-4 text-slate-900 font-semibold">{tx.party}</td>
+                            <td className="py-3 px-4 text-slate-900 font-semibold">
+                              {tx.party}
+                              {tx.companyFund && (
+                                <div className="text-[10px] text-blue-600 font-medium truncate max-w-[150px]">
+                                  Fund: {tx.companyFund.title}
+                                </div>
+                              )}
+                            </td>
                             <td className="py-3 px-4 text-slate-600">{tx.account.name}</td>
                             <td className={`py-3 px-4 text-right font-bold tabular-nums ${
                               tx.type === 'CASH_IN' ? 'text-emerald-600' : 'text-rose-600'

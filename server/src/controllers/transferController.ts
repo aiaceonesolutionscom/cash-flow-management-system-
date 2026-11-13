@@ -25,16 +25,21 @@ export const createTransfer = async (req: Request, res: Response): Promise<void>
     }
 
     const transfer = await prisma.$transaction(async (tx) => {
-      // 1. Verify both accounts belong to the exact same company
+      // 1. Verify source and destination accounts exist (allows same company or inter-company)
       const fromAcc = await tx.account.findFirst({
-        where: { id: fromAccountId, companyId }
+        where: { id: fromAccountId, companyId },
+        include: { company: true }
       });
       const toAcc = await tx.account.findFirst({
-        where: { id: toAccountId, companyId }
+        where: { id: toAccountId },
+        include: { company: true }
       });
 
-      if (!fromAcc || !toAcc) {
-        throw new Error('Both accounts must exist and belong to the selected company');
+      if (!fromAcc) {
+        throw new Error('Source account does not exist in the source company');
+      }
+      if (!toAcc) {
+        throw new Error('Destination account does not exist');
       }
 
       // 2. Decrement source account
@@ -70,8 +75,8 @@ export const createTransfer = async (req: Request, res: Response): Promise<void>
         },
         include: {
           company: true,
-          fromAccount: true,
-          toAccount: true
+          fromAccount: { include: { company: true } },
+          toAccount: { include: { company: true } }
         }
       });
     });
@@ -81,9 +86,10 @@ export const createTransfer = async (req: Request, res: Response): Promise<void>
       entity: 'TRANSFER',
       entityId: transfer.id,
       details: {
-        company: transfer.company.name,
-        from: transfer.fromAccount.name,
-        to: transfer.toAccount.name,
+        fromCompany: transfer.fromAccount.company.name,
+        fromAccount: transfer.fromAccount.name,
+        toCompany: transfer.toAccount.company.name,
+        toAccount: transfer.toAccount.name,
         amount: amountDec.toFixed(2),
         referenceNo: transfer.referenceNo
       },
@@ -138,8 +144,22 @@ export const getTransfers = async (req: Request, res: Response): Promise<void> =
         where,
         include: {
           company: { select: { id: true, name: true, code: true } },
-          fromAccount: { select: { id: true, name: true, type: true } },
-          toAccount: { select: { id: true, name: true, type: true } }
+          fromAccount: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              company: { select: { id: true, name: true, code: true } }
+            }
+          },
+          toAccount: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              company: { select: { id: true, name: true, code: true } }
+            }
+          }
         },
         orderBy: { transferDate: 'desc' },
         skip,

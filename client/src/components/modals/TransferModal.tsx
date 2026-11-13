@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRightLeft, Loader2 } from 'lucide-react';
+import { X, ArrowRightLeft, Building2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Company, Account } from '../../types';
 
@@ -18,10 +18,15 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   companies,
   initialCompanyId
 }) => {
-  const [companyId, setCompanyId] = useState<string>('');
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [fromCompanyId, setFromCompanyId] = useState<string>('');
+  const [toCompanyId, setToCompanyId] = useState<string>('');
+
+  const [fromAccounts, setFromAccounts] = useState<Account[]>([]);
+  const [toAccounts, setToAccounts] = useState<Account[]>([]);
+
   const [fromAccountId, setFromAccountId] = useState<string>('');
   const [toAccountId, setToAccountId] = useState<string>('');
+
   const [amount, setAmount] = useState<string>('');
   const [transferDate, setTransferDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [referenceNo, setReferenceNo] = useState<string>('');
@@ -32,7 +37,8 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       const defComp = initialCompanyId && initialCompanyId !== 'all' ? initialCompanyId : companies[0]?.id || '';
-      setCompanyId(defComp);
+      setFromCompanyId(defComp);
+      setToCompanyId(defComp);
       setAmount('');
       setReferenceNo('');
       setNotes('');
@@ -40,43 +46,70 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     }
   }, [isOpen, initialCompanyId, companies]);
 
+  // Load Source Accounts when fromCompanyId changes
   useEffect(() => {
-    if (!companyId) return;
+    if (!fromCompanyId) return;
 
-    const loadAccounts = async () => {
+    const loadFromAccounts = async () => {
       try {
-        const res = await api.get(`/accounts?companyId=${companyId}`);
+        const res = await api.get(`/accounts?companyId=${fromCompanyId}`);
         if (res.data.success) {
           const accs: Account[] = res.data.accounts;
-          setAccounts(accs);
-          if (accs.length >= 2) {
+          setFromAccounts(accs);
+          if (accs.length > 0) {
             setFromAccountId(accs[0].id);
+          } else {
+            setFromAccountId('');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load source accounts', err);
+      }
+    };
+    loadFromAccounts();
+  }, [fromCompanyId]);
+
+  // Load Destination Accounts when toCompanyId changes
+  useEffect(() => {
+    if (!toCompanyId) return;
+
+    const loadToAccounts = async () => {
+      try {
+        const res = await api.get(`/accounts?companyId=${toCompanyId}`);
+        if (res.data.success) {
+          const accs: Account[] = res.data.accounts;
+          setToAccounts(accs);
+          if (fromCompanyId === toCompanyId && accs.length >= 2) {
+            // Pick a different account if same company
             setToAccountId(accs[1].id);
-          } else if (accs.length === 1) {
-            setFromAccountId(accs[0].id);
+          } else if (accs.length > 0) {
+            setToAccountId(accs[0].id);
+          } else {
             setToAccountId('');
           }
         }
       } catch (err) {
-        console.error('Failed to load accounts for transfer', err);
+        console.error('Failed to load destination accounts', err);
       }
     };
-    loadAccounts();
-  }, [companyId]);
+    loadToAccounts();
+  }, [toCompanyId, fromCompanyId]);
 
   if (!isOpen) return null;
+
+  const isInterCompany = fromCompanyId && toCompanyId && fromCompanyId !== toCompanyId;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!companyId || !fromAccountId || !toAccountId || !amount || !transferDate) {
+    if (!fromCompanyId || !toCompanyId || !fromAccountId || !toAccountId || !amount || !transferDate) {
       setError('Please fill in all mandatory fields.');
       return;
     }
 
-    if (fromAccountId === toAccountId) {
-      setError('Source and Destination accounts cannot be the same.');
+    if (fromCompanyId === toCompanyId && fromAccountId === toAccountId) {
+      setError('Source and Destination accounts cannot be the same within the same company.');
       return;
     }
 
@@ -88,7 +121,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     try {
       setIsSubmitting(true);
       const res = await api.post('/transfers', {
-        companyId,
+        companyId: fromCompanyId,
         fromAccountId,
         toAccountId,
         amount,
@@ -109,105 +142,169 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-2 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-100 bg-blue-50/50">
-          <div className="flex items-center space-x-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-blue-50/60">
+          <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
-              <ArrowRightLeft className="w-5 h-5" />
+              <ArrowRightLeft className="w-4.5 h-4.5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Transfer Money</h3>
-              <p className="text-xs text-slate-500">Internal transfer between company accounts</p>
+              <h3 className="text-base font-bold text-slate-900">Transfer Money</h3>
+              <p className="text-xs text-slate-500">Between accounts (within company or across companies)</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        {/* Transfer Mode Indicator */}
+        <div className="px-5 pt-3">
+          {isInterCompany ? (
+            <div className="flex items-center space-x-2 p-2 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold">
+              <Building2 className="w-4 h-4 shrink-0 text-purple-600" />
+              <span>Inter-Company Transfer (Cross-Entity Fund Movement)</span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2 p-2 rounded-xl bg-blue-50/60 border border-blue-100 text-blue-700 text-xs font-semibold">
+              <Building2 className="w-4 h-4 shrink-0 text-blue-500" />
+              <span>Internal Account Transfer (Same Company)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
           {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg">
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium">
               {error}
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Company *</label>
-            <select
-              value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <p className="text-[11px] text-slate-400 mt-1">Transfers occur strictly between accounts within the same company.</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">From Account (Source) *</label>
-              <select
-                value={fromAccountId}
-                onChange={(e) => setFromAccountId(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id} disabled={a.id === toAccountId}>
-                    {a.name} ({a.type})
-                  </option>
-                ))}
-              </select>
+          {/* Source Section (From) */}
+          <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+              <span>Source (Money Leaving)</span>
+              <span className="text-rose-500 font-bold">- Deducts</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">To Account (Destination) *</label>
-              <select
-                value={toAccountId}
-                onChange={(e) => setToAccountId(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id} disabled={a.id === fromAccountId}>
-                    {a.name} ({a.type})
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">From Company *</label>
+                <select
+                  value={fromCompanyId}
+                  onChange={(e) => setFromCompanyId(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">From Account *</label>
+                <select
+                  value={fromAccountId}
+                  onChange={(e) => setFromAccountId(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                >
+                  {fromAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Destination Section (To) */}
+          <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+              <span>Destination (Money Arriving)</span>
+              <span className="text-emerald-600 font-bold">+ Credits</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">To Company *</label>
+                <select
+                  value={toCompanyId}
+                  onChange={(e) => setToCompanyId(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">To Account *</label>
+                <select
+                  value={toAccountId}
+                  onChange={(e) => setToAccountId(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                >
+                  {toAccounts.map((a) => (
+                    <option
+                      key={a.id}
+                      value={a.id}
+                      disabled={fromCompanyId === toCompanyId && a.id === fromAccountId}
+                    >
+                      {a.name} ({a.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Amount & Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Transfer Amount (PKR) *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium tabular-nums"
-                required
-              />
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Transfer Amount (PKR) *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">₨</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-800 tabular-nums"
+                  required
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Transfer Date *</label>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Transfer Date *
+              </label>
               <input
                 type="date"
                 value={transferDate}
                 onChange={(e) => setTransferDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Reference Number</label>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Reference Number
+            </label>
             <input
               type="text"
               value={referenceNo}
@@ -218,41 +315,34 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Transfer Notes</label>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Transfer Notes
+            </label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Purpose of transfer (e.g. Cash withdrawal, deposit, wallet topup)..."
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Reason for transfer (e.g. Inter-company loan, cash withdrawal, reimbursement)..."
+              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-normal"
             />
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
-            <span className="font-semibold text-slate-700">Financial Rule:</span> This transfer will deduct from source and add to destination without changing net cash flow or total available company balance.
-          </div>
-
+          {/* Action Buttons */}
           <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm flex items-center disabled:opacity-50"
+              className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm shadow-blue-500/20 flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Transferring...
-                </>
-              ) : (
-                'Execute Transfer'
-              )}
+              <span>Execute Transfer</span>
             </button>
           </div>
         </form>

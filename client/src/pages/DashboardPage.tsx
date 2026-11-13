@@ -242,7 +242,71 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Primary Analytics Charts Row */}
+      {/* Recent Financial Transactions Section (Top 5 Placed in Center) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Recent Transactions</h3>
+            <p className="text-xs text-slate-400">Latest recorded income & expense activities</p>
+          </div>
+          <span className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full">
+            Top 5 Recent
+          </span>
+        </div>
+
+        {recentTransactions.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-400">
+            No recent financial transactions found.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs min-w-[640px]">
+              <thead className="bg-slate-50 border-b border-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Company</th>
+                  <th className="py-3 px-4">Type</th>
+                  <th className="py-3 px-4">Category</th>
+                  <th className="py-3 px-4">Party / Vendor</th>
+                  <th className="py-3 px-4">Account</th>
+                  <th className="py-3 px-4 text-right">Amount (PKR)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {recentTransactions.slice(0, 5).map((tx) => (
+                  <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                      {format(new Date(tx.paymentDate), 'yyyy-MM-dd')}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">
+                      {tx.company.name}
+                    </td>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        tx.type === 'CASH_IN'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-rose-50 text-rose-700'
+                      }`}>
+                        {tx.type === 'CASH_IN' ? '+ Cash In' : '- Cash Out'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{tx.category.name}</td>
+                    <td className="py-3 px-4 text-slate-900 font-medium truncate max-w-[150px]">{tx.party}</td>
+                    <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{tx.account.name}</td>
+                    <td className={`py-3 px-4 text-right font-bold tabular-nums whitespace-nowrap ${
+                      tx.type === 'CASH_IN' ? 'text-emerald-600' : 'text-rose-600'
+                    }`}>
+                      {tx.type === 'CASH_IN' ? '+' : '-'}{formatPKR(tx.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Primary Analytics Charts Row (Moved Below Recent Transactions) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Monthly Cash In vs Cash Out (Bar Chart) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs lg:col-span-2 min-w-0">
@@ -370,67 +434,6 @@ export const DashboardPage: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
-
-      {/* Recent Financial Transactions Section */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Recent Transactions</h3>
-            <p className="text-xs text-slate-400">Latest recorded income & expense activities</p>
-          </div>
-        </div>
-
-        {recentTransactions.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400">
-            No recent financial transactions found.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs min-w-[640px]">
-              <thead className="bg-slate-50 border-b border-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Company</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Party / Vendor</th>
-                  <th className="py-3 px-4">Account</th>
-                  <th className="py-3 px-4 text-right">Amount (PKR)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {recentTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                      {format(new Date(tx.paymentDate), 'yyyy-MM-dd')}
-                    </td>
-                    <td className="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">
-                      {tx.company.name}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        tx.type === 'CASH_IN'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-rose-50 text-rose-700'
-                      }`}>
-                        {tx.type === 'CASH_IN' ? '+ Cash In' : '- Cash Out'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{tx.category.name}</td>
-                    <td className="py-3 px-4 text-slate-900 font-medium truncate max-w-[150px]">{tx.party}</td>
-                    <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{tx.account.name}</td>
-                    <td className={`py-3 px-4 text-right font-bold tabular-nums whitespace-nowrap ${
-                      tx.type === 'CASH_IN' ? 'text-emerald-600' : 'text-rose-600'
-                    }`}>
-                      {tx.type === 'CASH_IN' ? '+' : '-'}{formatPKR(tx.amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );

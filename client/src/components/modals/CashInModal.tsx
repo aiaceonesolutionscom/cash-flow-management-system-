@@ -84,6 +84,8 @@ export const CashInModal: React.FC<CashInModalProps> = ({
       if (!initialFundId) {
         setParty('');
         setSelectedFundId('');
+      } else {
+        setSelectedFundId(initialFundId);
       }
       setReferenceNo('');
       setDescription('');
@@ -120,10 +122,20 @@ export const CashInModal: React.FC<CashInModalProps> = ({
           }
         }
         if (catRes.data.success) {
-          setCategories(catRes.data.categories);
-          if (catRes.data.categories.length > 0) {
-            setCategoryId(catRes.data.categories[0].id);
-            setCategoryInput(catRes.data.categories[0].name);
+          const cats: Category[] = catRes.data.categories;
+          setCategories(cats);
+          if (initialFundId || selectedFundId) {
+            const fundCat = cats.find((c) => c.name.toLowerCase().includes('fund'));
+            if (fundCat) {
+              setCategoryId(fundCat.id);
+              setCategoryInput(fundCat.name);
+            } else {
+              setCategoryInput('Company Funds');
+              setCategoryId('');
+            }
+          } else if (cats.length > 0) {
+            setCategoryId(cats[0].id);
+            setCategoryInput(cats[0].name);
           } else {
             setCategoryId('');
             setCategoryInput('');
