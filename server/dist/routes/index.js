@@ -52,6 +52,7 @@ const auditController = __importStar(require("../controllers/auditController"));
 const attachmentController = __importStar(require("../controllers/attachmentController"));
 const companyNoteController = __importStar(require("../controllers/companyNoteController"));
 const fundController = __importStar(require("../controllers/fundController"));
+const systemLogController = __importStar(require("../controllers/systemLogController"));
 const router = (0, express_1.Router)();
 // Global API Request Rate Limiter (Protects against DoS & automated scrapers)
 router.use(rateLimiter_1.generalApiRateLimiter);
@@ -100,6 +101,10 @@ router.get('/reports/export/pdf', auth_1.requireAdmin, reportController.exportRe
 router.get('/reports/export/csv', auth_1.requireAdmin, reportController.exportReportCSV);
 // Audit Logs
 router.get('/audit-logs', auth_1.requireAdmin, auditController.getAuditLogs);
+// System Technical Error Logs
+router.get('/system-logs', auth_1.requireAdmin, systemLogController.getSystemLogs);
+router.post('/system-logs/clear', auth_1.requireAdmin, systemLogController.clearSystemLogs);
+router.get('/system-logs/download', auth_1.requireAdmin, systemLogController.downloadSystemLogs);
 // Company Notes & Financial Requirements
 router.get('/company-notes', auth_1.requireAdmin, companyNoteController.getCompanyNotes);
 router.get('/company-notes/summary', auth_1.requireAdmin, companyNoteController.getCompanyNotesSummary);

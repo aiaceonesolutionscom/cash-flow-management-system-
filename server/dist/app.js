@@ -11,6 +11,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const routes_1 = __importDefault(require("./routes"));
+const logger_1 = require("./utils/logger");
 const createApp = () => {
     const app = (0, express_1.default)();
     // Hide technology fingerprinting
@@ -65,9 +66,9 @@ const createApp = () => {
             res.sendFile(path_1.default.join(staticPath, 'index.html'));
         });
     }
-    // Global Error Handler
-    app.use((err, _req, res, _next) => {
-        console.error('Unhandled Application Error:', err);
+    // Global Error Handler (Logs exact line, route, IP and stack trace to logs/error.log)
+    app.use((err, req, res, _next) => {
+        logger_1.logger.error(`Application Error on ${req.method} ${req.originalUrl || req.url}`, err, req);
         res.status(err.status || 500).json({
             success: false,
             message: err.message || 'Internal server error'

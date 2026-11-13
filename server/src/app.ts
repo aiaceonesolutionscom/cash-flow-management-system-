@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
 import routes from './routes';
+import { logger } from './utils/logger';
 
 export const createApp = () => {
   const app = express();
@@ -70,9 +71,9 @@ export const createApp = () => {
     });
   }
 
-  // Global Error Handler
-  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    console.error('Unhandled Application Error:', err);
+  // Global Error Handler (Logs exact line, route, IP and stack trace to logs/error.log)
+  app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    logger.error(`Application Error on ${req.method} ${req.originalUrl || req.url}`, err, req);
     res.status(err.status || 500).json({
       success: false,
       message: err.message || 'Internal server error'

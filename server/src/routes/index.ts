@@ -18,6 +18,7 @@ import * as auditController from '../controllers/auditController';
 import * as attachmentController from '../controllers/attachmentController';
 import * as companyNoteController from '../controllers/companyNoteController';
 import * as fundController from '../controllers/fundController';
+import * as systemLogController from '../controllers/systemLogController';
 
 const router = Router();
 
@@ -79,6 +80,11 @@ router.get('/reports/export/csv', requireAdmin, reportController.exportReportCSV
 
 // Audit Logs
 router.get('/audit-logs', requireAdmin, auditController.getAuditLogs);
+
+// System Technical Error Logs
+router.get('/system-logs', requireAdmin, systemLogController.getSystemLogs);
+router.post('/system-logs/clear', requireAdmin, systemLogController.clearSystemLogs);
+router.get('/system-logs/download', requireAdmin, systemLogController.downloadSystemLogs);
 
 // Company Notes & Financial Requirements
 router.get('/company-notes', requireAdmin, companyNoteController.getCompanyNotes);
