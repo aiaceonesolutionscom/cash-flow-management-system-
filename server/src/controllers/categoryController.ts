@@ -104,23 +104,27 @@ export const createCategory = async (req: Request, res: Response): Promise<void>
 export const updateCategory = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, type, companyId } = req.body;
 
     if (!name) {
       res.status(400).json({ success: false, message: 'Name is required' });
       return;
     }
 
+    const data: any = { name: name.trim() };
+    if (type) data.type = type;
+    if (companyId !== undefined) data.companyId = companyId ? companyId : null;
+
     const category = await prisma.category.update({
       where: { id },
-      data: { name: name.trim() }
+      data
     });
 
     await createAuditLog({
       action: AuditAction.UPDATE,
       entity: 'CATEGORY',
       entityId: category.id,
-      details: { newName: category.name },
+      details: { newName: category.name, type: category.type },
       ipAddress: req.ip
     });
 

@@ -12,6 +12,7 @@ import { PaymentVoucherModal } from '../components/common/PaymentVoucherModal';
 import { BulkImportModal } from '../components/modals/BulkImportModal';
 import { CashInModal } from '../components/modals/CashInModal';
 import { CashOutModal } from '../components/modals/CashOutModal';
+import { SearchableSelect } from '../components/common/SearchableSelect';
 
 export const TransactionsPage: React.FC = () => {
   const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName, companies } = useFilters();
@@ -246,17 +247,20 @@ export const TransactionsPage: React.FC = () => {
             <option value="WALLET">📱 Wallet</option>
           </select>
 
-          {/* Category Filter */}
-          <select
+          {/* Searchable Category Filter */}
+          <SearchableSelect
             value={categoryFilter}
-            onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
-          >
-            <option value="all">All Categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name} ({c.type})</option>
-            ))}
-          </select>
+            onChange={(val) => {
+              setCategoryFilter(val);
+              setPage(1);
+            }}
+            options={categories.map((c) => ({
+              value: c.id,
+              label: c.name,
+              badge: c.type === 'INCOME' ? 'In' : 'Out'
+            }))}
+            allLabel="All Categories"
+          />
         </div>
       </div>
 

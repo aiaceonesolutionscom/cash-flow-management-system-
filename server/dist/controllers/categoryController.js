@@ -99,20 +99,25 @@ exports.createCategory = createCategory;
 const updateCategory = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name } = req.body;
+        const { name, type, companyId } = req.body;
         if (!name) {
             res.status(400).json({ success: false, message: 'Name is required' });
             return;
         }
+        const data = { name: name.trim() };
+        if (type)
+            data.type = type;
+        if (companyId !== undefined)
+            data.companyId = companyId ? companyId : null;
         const category = await prisma_1.prisma.category.update({
             where: { id },
-            data: { name: name.trim() }
+            data
         });
         await (0, audit_1.createAuditLog)({
             action: client_1.AuditAction.UPDATE,
             entity: 'CATEGORY',
             entityId: category.id,
-            details: { newName: category.name },
+            details: { newName: category.name, type: category.type },
             ipAddress: req.ip
         });
         res.json({ success: true, category });

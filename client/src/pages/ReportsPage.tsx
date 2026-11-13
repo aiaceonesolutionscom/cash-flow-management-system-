@@ -14,6 +14,7 @@ import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Category } from '../types';
 import { format } from 'date-fns';
+import { SearchableSelect } from '../components/common/SearchableSelect';
 
 export const ReportsPage: React.FC = () => {
   const { selectedCompanyId, refreshTrigger, activeCompanyName } = useFilters();
@@ -302,19 +303,16 @@ export const ReportsPage: React.FC = () => {
                 </select>
               </div>
 
-              {/* Category Filter */}
+              {/* Searchable Category Filter */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
-                <select
+                <SearchableSelect
                   value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 cursor-pointer"
-                >
-                  <option value="all">All Categories</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setCategoryFilter(val)}
+                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                  allLabel="All Categories"
+                  className="w-full"
+                />
               </div>
             </>
           )}

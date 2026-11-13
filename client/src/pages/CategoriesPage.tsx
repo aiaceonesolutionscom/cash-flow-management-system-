@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Tag, Plus, Trash2, Loader2, RefreshCw, X } from 'lucide-react';
+import { Tag, Plus, Trash2, Loader2, RefreshCw, X, Pencil } from 'lucide-react';
 import { api } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Category, CategoryType, Company } from '../types';
@@ -14,8 +14,9 @@ export const CategoriesPage: React.FC = () => {
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
 
-  // Create Modal State
+  // Modal State (Create / Edit)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [catName, setCatName] = useState<string>('');
   const [catType, setCatType] = useState<CategoryType>('EXPENSE');
   const [companyId, setCompanyId] = useState<string>('');
@@ -65,6 +66,7 @@ export const CategoriesPage: React.FC = () => {
   }, [selectedCompanyId, typeFilter, refreshTrigger]);
 
   const handleOpenCreate = () => {
+    setEditingCategory(null);
     setCatName('');
     setCatType('EXPENSE');
     setCompanyId(selectedCompanyId !== 'all' ? selectedCompanyId : (companies[0]?.id || ''));
@@ -72,7 +74,16 @@ export const CategoriesPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleOpenEdit = (cat: Category) => {
+    setEditingCategory(cat);
+    setCatName(cat.name);
+    setCatType(cat.type);
+    setCompanyId(cat.companyId || '');
+    setError('');
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -83,17 +94,24 @@ export const CategoriesPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const res = await api.post('/categories', {
+      const payload: any = {
         name: catName.trim(),
         type: catType,
-        companyId: companyId || undefined
-      });
+        companyId: companyId || null
+      };
+
+      const res = editingCategory
+        ? await api.put(`/categories/${editingCategory.id}`, payload)
+        : await api.post('/categories', payload);
+
       if (res.data.success) {
         setIsModalOpen(false);
+        setEditingCategory(null);
         triggerRefresh();
+        fetchCategories();
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create category.');
+      setError(err.response?.data?.message || (editingCategory ? 'Failed to update category.' : 'Failed to create category.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -217,13 +235,22 @@ export const CategoriesPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleDeleteClick(cat)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
-                    title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      onClick={() => handleOpenEdit(cat)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                      title="Edit Category"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(cat)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -258,13 +285,22 @@ export const CategoriesPage: React.FC = () => {
                         {cat._count?.transactions || 0} transactions
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => handleDeleteClick(cat)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => handleOpenEdit(cat)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                            title="Edit Category"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(cat)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title={cat._count && cat._count.transactions > 0 ? 'Cannot delete: transactions linked' : 'Delete category'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -294,13 +330,20 @@ export const CategoriesPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-base">Create New Category</h3>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">
+                  {editingCategory ? 'Edit Category' : 'Create New Category'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {editingCategory ? 'Modify category name or classification type' : 'Add custom income or expense category'}
+                </p>
+              </div>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {error && (
                 <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
                   {error}
@@ -362,13 +405,15 @@ export const CategoriesPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm flex items-center disabled:opacity-50"
+                  className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm flex items-center disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating...
+                      Saving...
                     </>
+                  ) : editingCategory ? (
+                    'Update Category'
                   ) : (
                     'Create Category'
                   )}

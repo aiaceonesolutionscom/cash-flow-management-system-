@@ -10,6 +10,7 @@ import { ReceiptModal } from '../components/common/ReceiptModal';
 import { UndoToast } from '../components/common/UndoToast';
 import { PaymentVoucherModal } from '../components/common/PaymentVoucherModal';
 import { CashInModal } from '../components/modals/CashInModal';
+import { SearchableSelect } from '../components/common/SearchableSelect';
 
 interface CashInPageProps {
   onOpenCreate: () => void;
@@ -256,29 +257,24 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
           </form>
 
           <div className="flex items-center space-x-2 w-full sm:w-auto flex-wrap">
-            {/* Category Dropdown Filter */}
-            <select
+            {/* Searchable Category Dropdown Filter */}
+            <SearchableSelect
               value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
+              onChange={(val) => {
+                setCategoryFilter(val);
                 setPage(1);
               }}
-              className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-semibold cursor-pointer max-w-[200px] truncate"
-            >
-              <option value="all">All Categories</option>
-              {fundCategory ? (
-                <option value={fundCategory.id}>🏢 Company Funds</option>
-              ) : (
-                <option value="company_funds">🏢 Company Funds</option>
-              )}
-              {categories
-                .filter((c) => !c.name.toLowerCase().includes('fund'))
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
+              options={[
+                {
+                  value: fundCategory ? fundCategory.id : 'company_funds',
+                  label: '🏢 Company Funds'
+                },
+                ...categories
+                  .filter((c) => !c.name.toLowerCase().includes('fund'))
+                  .map((c) => ({ value: c.id, label: c.name }))
+              ]}
+              allLabel="All Categories"
+            />
 
             {/* Account Type Filter */}
             <select

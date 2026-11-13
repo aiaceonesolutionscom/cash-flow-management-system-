@@ -68,8 +68,7 @@ export const CompanyNoteModal: React.FC<CompanyNoteModalProps> = ({
         setDueDate('');
         setNotes('');
         setItems([
-          { itemName: 'Meta Ads', amount: '' },
-          { itemName: 'Google Ads', amount: '' }
+          { itemName: '', amount: '' }
         ]);
       }
     }
