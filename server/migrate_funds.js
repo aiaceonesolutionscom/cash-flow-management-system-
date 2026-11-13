@@ -1,7 +1,7 @@
 const { prisma } = require('./dist/prisma');
 
 async function migrate() {
-  console.log('--- Creating Company Funds Table in PostgreSQL ---');
+  console.log('--- Finalizing PostgreSQL Schema for Funds ---');
   try {
     await prisma.$executeRawUnsafe(`
       DO $$ BEGIN
@@ -10,7 +10,6 @@ async function migrate() {
           WHEN duplicate_object THEN null;
       END $$;
     `);
-    console.log('1. Enum FundStatus verified.');
 
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "company_funds" (
@@ -30,15 +29,18 @@ async function migrate() {
           CONSTRAINT "company_funds_pkey" PRIMARY KEY ("id")
       );
     `);
-    console.log('2. Table company_funds created successfully.');
 
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "company_funds_status_idx" ON "company_funds"("status");
-      CREATE INDEX IF NOT EXISTS "company_funds_fund_date_idx" ON "company_funds"("fund_date");
-      ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "company_fund_id" TEXT;
-      CREATE INDEX IF NOT EXISTS "transactions_company_fund_id_idx" ON "transactions"("company_fund_id");
-    `);
-    console.log('3. Columns and indexes created successfully.');
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "company_funds_status_idx" ON "company_funds"("status");`);
+    console.log('1. company_funds_status_idx verified.');
+
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "company_funds_fund_date_idx" ON "company_funds"("fund_date");`);
+    console.log('2. company_funds_fund_date_idx verified.');
+
+    await prisma.$executeRawUnsafe(`ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "company_fund_id" TEXT;`);
+    console.log('3. transactions.company_fund_id verified.');
+
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "transactions_company_fund_id_idx" ON "transactions"("company_fund_id");`);
+    console.log('4. transactions_company_fund_id_idx verified.');
 
     await prisma.$executeRawUnsafe(`
       DO $$ BEGIN
@@ -50,7 +52,7 @@ async function migrate() {
           WHEN duplicate_object THEN null;
       END $$;
     `);
-    console.log('4. Foreign key relation verified.');
+    console.log('5. Foreign key relation verified.');
 
     console.log('=== MIGRATION COMPLETE: 100% SUCCESS ===');
     process.exit(0);
