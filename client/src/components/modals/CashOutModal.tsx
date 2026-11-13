@@ -9,6 +9,7 @@ interface CashOutModalProps {
   onSuccess: () => void;
   companies: Company[];
   initialCompanyId?: string;
+  editTransaction?: any;
 }
 
 export const CashOutModal: React.FC<CashOutModalProps> = ({
@@ -16,7 +17,8 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
   onClose,
   onSuccess,
   companies,
-  initialCompanyId
+  initialCompanyId,
+  editTransaction
 }) => {
   const [companyId, setCompanyId] = useState<string>('');
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -38,17 +40,36 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const defComp = initialCompanyId && initialCompanyId !== 'all' ? initialCompanyId : companies[0]?.id || '';
-      setCompanyId(defComp);
-      setAmount('');
-      setParty('');
-      setReferenceNo('');
-      setDescription('');
-      setReceiptFile(null);
-      setError('');
-      setIsCatDropdownOpen(false);
+      if (editTransaction) {
+        setCompanyId(editTransaction.companyId);
+        setAmount(String(editTransaction.amount));
+        setParty(editTransaction.party || '');
+        setAccountId(editTransaction.accountId || '');
+        setCategoryId(editTransaction.categoryId || '');
+        setCategoryInput(editTransaction.category?.name || '');
+        setPaymentDate(
+          editTransaction.paymentDate
+            ? new Date(editTransaction.paymentDate).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0]
+        );
+        setReferenceNo(editTransaction.referenceNo || '');
+        setDescription(editTransaction.description || '');
+        setReceiptFile(null);
+        setError('');
+        setIsCatDropdownOpen(false);
+      } else {
+        const defComp = initialCompanyId && initialCompanyId !== 'all' ? initialCompanyId : companies[0]?.id || '';
+        setCompanyId(defComp);
+        setAmount('');
+        setParty('');
+        setReferenceNo('');
+        setDescription('');
+        setReceiptFile(null);
+        setError('');
+        setIsCatDropdownOpen(false);
+      }
     }
-  }, [isOpen, initialCompanyId, companies]);
+  }, [isOpen, initialCompanyId, companies, editTransaction]);
 
   // Close category dropdown on outside click
   useEffect(() => {
@@ -73,12 +94,19 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
         if (accRes.data.success) {
           setAccounts(accRes.data.accounts);
           if (accRes.data.accounts.length > 0) {
-            setAccountId(accRes.data.accounts[0].id);
+            if (editTransaction?.accountId && accRes.data.accounts.some((a: any) => a.id === editTransaction.accountId)) {
+              setAccountId(editTransaction.accountId);
+            } else {
+              setAccountId(accRes.data.accounts[0].id);
+            }
           }
         }
         if (catRes.data.success) {
           setCategories(catRes.data.categories);
-          if (catRes.data.categories.length > 0) {
+          if (editTransaction?.categoryId) {
+            setCategoryId(editTransaction.categoryId);
+            setCategoryInput(editTransaction.category?.name || '');
+          } else if (catRes.data.categories.length > 0) {
             setCategoryId(catRes.data.categories[0].id);
             setCategoryInput(catRes.data.categories[0].name);
           } else {
@@ -159,16 +187,20 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
       if (description) formData.append('description', description);
       if (receiptFile) formData.append('receipt', receiptFile);
 
-      const res = await api.post('/cash-out', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = editTransaction
+        ? await api.put(`/cash-out/${editTransaction.id}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          })
+        : await api.post('/cash-out', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
 
       if (res.data.success) {
         onSuccess();
         onClose();
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to record Cash Out.');
+      setError(err.response?.data?.message || 'Failed to save Cash Out.');
     } finally {
       setIsSubmitting(false);
     }
@@ -183,8 +215,12 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
               <ArrowUpRight className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Record Cash Out / Expense</h3>
-              <p className="text-xs text-slate-500">Record an outgoing expense or payment</p>
+              <h3 className="text-lg font-bold text-slate-900">
+                {editTransaction ? 'Edit Cash Out / Expense' : 'Record Cash Out / Expense'}
+              </h3>
+              <p className="text-xs text-slate-500">
+                {editTransaction ? 'Modify existing cash outflow record' : 'Record an outgoing expense or payment'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
@@ -402,6 +438,8 @@ export const CashOutModal: React.FC<CashOutModalProps> = ({
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
+              ) : editTransaction ? (
+                'Update Cash Out'
               ) : (
                 'Save Cash Out'
               )}

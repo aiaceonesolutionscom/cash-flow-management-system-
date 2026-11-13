@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlusCircle, Search, Trash2, ArrowUpRight, Paperclip, Loader2, RefreshCw, Calendar, Printer } from 'lucide-react';
+import { PlusCircle, Search, Trash2, ArrowUpRight, Paperclip, Loader2, RefreshCw, Calendar, Printer, Pencil } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Category } from '../types';
@@ -9,13 +9,14 @@ import { Pagination } from '../components/common/Pagination';
 import { ReceiptModal } from '../components/common/ReceiptModal';
 import { UndoToast } from '../components/common/UndoToast';
 import { PaymentVoucherModal } from '../components/common/PaymentVoucherModal';
+import { CashOutModal } from '../components/modals/CashOutModal';
 
 interface CashOutPageProps {
   onOpenCreate: () => void;
 }
 
 export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
-  const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
+  const { companies, selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalAmount, setTotalAmount] = useState<string>('0.00');
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -27,6 +28,7 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; party: string; amount: string; category: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [undoSnapshot, setUndoSnapshot] = useState<any | null>(null);
@@ -326,6 +328,14 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
                       </button>
 
                       <button
+                        onClick={() => setEditingTx(tx)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                        title="Edit Cash Out"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+
+                      <button
                         onClick={() => setDeleteTarget({
                           id: tx.id,
                           party: tx.party || 'Vendor',
@@ -425,6 +435,13 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
                             <Printer className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => setEditingTx(tx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                            title="Edit Cash Out"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => setDeleteTarget({
                               id: tx.id,
                               party: tx.party || 'Vendor',
@@ -491,6 +508,21 @@ export const CashOutPage: React.FC<CashOutPageProps> = ({ onOpenCreate }) => {
         onClose={() => setActiveVoucher(null)}
         transaction={activeVoucher}
       />
+
+      {/* Edit Cash Out Modal */}
+      {editingTx && (
+        <CashOutModal
+          isOpen={!!editingTx}
+          onClose={() => setEditingTx(null)}
+          onSuccess={() => {
+            setEditingTx(null);
+            triggerRefresh();
+            fetchCashOut();
+          }}
+          companies={companies}
+          editTransaction={editingTx}
+        />
+      )}
 
       {/* Floating Undo Toast */}
       <UndoToast

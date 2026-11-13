@@ -20,6 +20,7 @@ interface CashInModalProps {
   companies: Company[];
   initialCompanyId?: string;
   initialFundId?: string;
+  editTransaction?: any;
 }
 
 export const CashInModal: React.FC<CashInModalProps> = ({
@@ -28,7 +29,8 @@ export const CashInModal: React.FC<CashInModalProps> = ({
   onSuccess,
   companies,
   initialCompanyId,
-  initialFundId
+  initialFundId,
+  editTransaction
 }) => {
   const [companyId, setCompanyId] = useState<string>('');
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -78,22 +80,42 @@ export const CashInModal: React.FC<CashInModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const defComp = initialCompanyId && initialCompanyId !== 'all' ? initialCompanyId : companies[0]?.id || '';
-      setCompanyId(defComp);
-      setAmount('');
-      if (!initialFundId) {
-        setParty('');
-        setSelectedFundId('');
+      if (editTransaction) {
+        setCompanyId(editTransaction.companyId);
+        setAmount(String(editTransaction.amount));
+        setParty(editTransaction.party || '');
+        setAccountId(editTransaction.accountId || '');
+        setCategoryId(editTransaction.categoryId || '');
+        setCategoryInput(editTransaction.category?.name || '');
+        setPaymentDate(
+          editTransaction.paymentDate
+            ? new Date(editTransaction.paymentDate).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0]
+        );
+        setReferenceNo(editTransaction.referenceNo || '');
+        setDescription(editTransaction.description || '');
+        setSelectedFundId(editTransaction.companyFundId || '');
+        setReceiptFile(null);
+        setError('');
+        setIsCatDropdownOpen(false);
       } else {
-        setSelectedFundId(initialFundId);
+        const defComp = initialCompanyId && initialCompanyId !== 'all' ? initialCompanyId : companies[0]?.id || '';
+        setCompanyId(defComp);
+        setAmount('');
+        if (!initialFundId) {
+          setParty('');
+          setSelectedFundId('');
+        } else {
+          setSelectedFundId(initialFundId);
+        }
+        setReferenceNo('');
+        setDescription('');
+        setReceiptFile(null);
+        setError('');
+        setIsCatDropdownOpen(false);
       }
-      setReferenceNo('');
-      setDescription('');
-      setReceiptFile(null);
-      setError('');
-      setIsCatDropdownOpen(false);
     }
-  }, [isOpen, initialCompanyId, companies, initialFundId]);
+  }, [isOpen, initialCompanyId, companies, initialFundId, editTransaction]);
 
   // Close category dropdown on outside click
   useEffect(() => {
@@ -118,13 +140,20 @@ export const CashInModal: React.FC<CashInModalProps> = ({
         if (accRes.data.success) {
           setAccounts(accRes.data.accounts);
           if (accRes.data.accounts.length > 0) {
-            setAccountId(accRes.data.accounts[0].id);
+            if (editTransaction?.accountId && accRes.data.accounts.some((a: any) => a.id === editTransaction.accountId)) {
+              setAccountId(editTransaction.accountId);
+            } else {
+              setAccountId(accRes.data.accounts[0].id);
+            }
           }
         }
         if (catRes.data.success) {
           const cats: Category[] = catRes.data.categories;
           setCategories(cats);
-          if (initialFundId || selectedFundId) {
+          if (editTransaction?.categoryId) {
+            setCategoryId(editTransaction.categoryId);
+            setCategoryInput(editTransaction.category?.name || '');
+          } else if (initialFundId || selectedFundId) {
             const fundCat = cats.find((c) => c.name.toLowerCase().includes('fund'));
             if (fundCat) {
               setCategoryId(fundCat.id);
@@ -246,16 +275,20 @@ export const CashInModal: React.FC<CashInModalProps> = ({
       if (receiptFile) formData.append('receipt', receiptFile);
       if (selectedFundId) formData.append('companyFundId', selectedFundId);
 
-      const res = await api.post('/cash-in', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = editTransaction
+        ? await api.put(`/cash-in/${editTransaction.id}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          })
+        : await api.post('/cash-in', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
 
       if (res.data.success) {
         onSuccess();
         onClose();
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to record Cash In.');
+      setError(err.response?.data?.message || 'Failed to save Cash In.');
     } finally {
       setIsSubmitting(false);
     }
@@ -270,8 +303,12 @@ export const CashInModal: React.FC<CashInModalProps> = ({
               <ArrowDownRight className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Record Cash In</h3>
-              <p className="text-xs text-slate-500">Add incoming payment into an account</p>
+              <h3 className="text-lg font-bold text-slate-900">
+                {editTransaction ? 'Edit Cash In' : 'Record Cash In'}
+              </h3>
+              <p className="text-xs text-slate-500">
+                {editTransaction ? 'Modify existing cash inflow record' : 'Add incoming payment into an account'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
@@ -528,6 +565,8 @@ export const CashInModal: React.FC<CashInModalProps> = ({
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
+              ) : editTransaction ? (
+                'Update Cash In'
               ) : (
                 'Save Cash In'
               )}

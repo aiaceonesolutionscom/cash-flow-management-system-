@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, ReceiptText, Loader2, RefreshCw, Paperclip, Trash2, Calendar, Printer, Upload } from 'lucide-react';
+import { Search, ReceiptText, Loader2, RefreshCw, Paperclip, Trash2, Calendar, Printer, Upload, Pencil } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Category } from '../types';
@@ -10,6 +10,8 @@ import { ReceiptModal } from '../components/common/ReceiptModal';
 import { UndoToast } from '../components/common/UndoToast';
 import { PaymentVoucherModal } from '../components/common/PaymentVoucherModal';
 import { BulkImportModal } from '../components/modals/BulkImportModal';
+import { CashInModal } from '../components/modals/CashInModal';
+import { CashOutModal } from '../components/modals/CashOutModal';
 
 export const TransactionsPage: React.FC = () => {
   const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName, companies } = useFilters();
@@ -21,6 +23,7 @@ export const TransactionsPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [limit, setLimit] = useState<number>(25);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: string; party: string; amount: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [undoSnapshot, setUndoSnapshot] = useState<any | null>(null);
@@ -351,6 +354,16 @@ export const TransactionsPage: React.FC = () => {
                         <Printer className="w-4 h-4" />
                       </button>
 
+                      {(tx.type === 'CASH_IN' || tx.type === 'CASH_OUT') && (
+                        <button
+                          onClick={() => setEditingTx(tx)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                          title={`Edit ${tx.type === 'CASH_IN' ? 'Cash In' : 'Cash Out'}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+
                       <button
                         onClick={() => setDeleteTarget({
                           id: tx.id,
@@ -462,6 +475,15 @@ export const TransactionsPage: React.FC = () => {
                           >
                             <Printer className="w-4 h-4" />
                           </button>
+                          {(tx.type === 'CASH_IN' || tx.type === 'CASH_OUT') && (
+                            <button
+                              onClick={() => setEditingTx(tx)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                              title={`Edit ${tx.type === 'CASH_IN' ? 'Cash In' : 'Cash Out'}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setDeleteTarget({
                               id: tx.id,
@@ -542,6 +564,36 @@ export const TransactionsPage: React.FC = () => {
         companies={companies}
         initialCompanyId={selectedCompanyId}
       />
+
+      {/* Edit Cash In Modal */}
+      {editingTx && editingTx.type === 'CASH_IN' && (
+        <CashInModal
+          isOpen={!!editingTx}
+          onClose={() => setEditingTx(null)}
+          onSuccess={() => {
+            setEditingTx(null);
+            triggerRefresh();
+            fetchTransactions();
+          }}
+          companies={companies}
+          editTransaction={editingTx}
+        />
+      )}
+
+      {/* Edit Cash Out Modal */}
+      {editingTx && editingTx.type === 'CASH_OUT' && (
+        <CashOutModal
+          isOpen={!!editingTx}
+          onClose={() => setEditingTx(null)}
+          onSuccess={() => {
+            setEditingTx(null);
+            triggerRefresh();
+            fetchTransactions();
+          }}
+          companies={companies}
+          editTransaction={editingTx}
+        />
+      )}
 
       {/* Floating Undo Toast */}
       <UndoToast

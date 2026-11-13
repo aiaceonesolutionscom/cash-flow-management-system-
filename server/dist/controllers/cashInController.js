@@ -284,6 +284,26 @@ const updateCashIn = async (req, res) => {
                     }
                 }
             });
+            // 2b. If linked to CompanyFund, sync fund allocated amount and status
+            if (existing.companyFundId) {
+                const diff = newAmountDec.minus(existing.amount);
+                const fund = await tx.companyFund.findUnique({ where: { id: existing.companyFundId } });
+                if (fund) {
+                    const newAllocated = Math.max(0, Number(fund.allocatedAmount) + diff.toNumber());
+                    const newStatus = newAllocated >= Number(fund.totalAmount)
+                        ? 'FULLY_ALLOCATED'
+                        : newAllocated > 0
+                            ? 'PARTIALLY_ALLOCATED'
+                            : 'UNALLOCATED';
+                    await tx.companyFund.update({
+                        where: { id: existing.companyFundId },
+                        data: {
+                            allocatedAmount: newAllocated,
+                            status: newStatus
+                        }
+                    });
+                }
+            }
             // 3. Update transaction record
             const txn = await tx.transaction.update({
                 where: { id },

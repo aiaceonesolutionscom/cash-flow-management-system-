@@ -15,7 +15,8 @@ import {
   TrendingUp,
   Wallet,
   RefreshCw,
-  Info
+  Info,
+  Pencil
 } from 'lucide-react';
 import { api } from '../services/api';
 import { CompanyFund, FundsSummary, FundStatus, Company } from '../types';
@@ -41,6 +42,7 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [editingFund, setEditingFund] = useState<CompanyFund | null>(null);
   const [viewerModalState, setViewerModalState] = useState<{
     isOpen: boolean;
     title: string;
@@ -374,13 +376,22 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
                         <button
                           type="button"
                           onClick={() => openDistributeModal(fund.id)}
-                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all flex items-center space-x-1.5 shadow-2xs cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all flex items-space-x-1.5 shadow-2xs cursor-pointer"
                           title="Allocate to a company via Cash In"
                         >
                           <ArrowDownRight className="w-3.5 h-3.5" />
                           <span>+ Allocate via Cash In</span>
                         </button>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={() => setEditingFund(fund)}
+                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all cursor-pointer"
+                        title="Edit Fund Details"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
 
                       <button
                         type="button"
@@ -508,6 +519,19 @@ export const FundsPage: React.FC<FundsPageProps> = ({ companies }) => {
           loadFunds();
         }}
       />
+
+      {/* Edit Fund Modal */}
+      {editingFund && (
+        <AddFundModal
+          isOpen={!!editingFund}
+          editFund={editingFund}
+          onClose={() => setEditingFund(null)}
+          onSuccess={() => {
+            setEditingFund(null);
+            loadFunds();
+          }}
+        />
+      )}
 
       {/* Slip Viewer Modal */}
       <AttachmentViewerModal

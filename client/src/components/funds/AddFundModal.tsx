@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Upload, Coins, Loader2, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -6,9 +6,10 @@ interface AddFundModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  editFund?: any;
 }
 
-export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onSuccess, editFund }) => {
   const [title, setTitle] = useState<string>('Director Capital Inflow');
   const [totalAmount, setTotalAmount] = useState<string>('');
   const [receivedFrom, setReceivedFrom] = useState<string>('');
@@ -18,6 +19,34 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (editFund) {
+        setTitle(editFund.title || '');
+        setTotalAmount(String(editFund.totalAmount || ''));
+        setReceivedFrom(editFund.receivedFrom || '');
+        setReceivingMethod(editFund.receivingMethod || '');
+        setFundDate(
+          editFund.fundDate
+            ? new Date(editFund.fundDate).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0]
+        );
+        setDescription(editFund.description || '');
+        setReceiptFile(null);
+        setError('');
+      } else {
+        setTitle('Director Capital Inflow');
+        setTotalAmount('');
+        setReceivedFrom('');
+        setReceivingMethod('');
+        setFundDate(new Date().toISOString().split('T')[0]);
+        setDescription('');
+        setReceiptFile(null);
+        setError('');
+      }
+    }
+  }, [isOpen, editFund]);
 
   if (!isOpen) return null;
 
@@ -42,16 +71,20 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
       if (description.trim()) formData.append('description', description.trim());
       if (receiptFile) formData.append('receipt', receiptFile);
 
-      const res = await api.post('/funds', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = editFund
+        ? await api.put(`/funds/${editFund.id}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          })
+        : await api.post('/funds', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
 
       if (res.data.success) {
         onSuccess();
         onClose();
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to record fund inflow.');
+      setError(err.response?.data?.message || (editFund ? 'Failed to update fund.' : 'Failed to record fund inflow.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -67,8 +100,12 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
               <Coins className="w-4.5 h-4.5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Record New Capital Fund</h3>
-              <p className="text-xs text-slate-500">Inflow from Investor / Director into Central Pool</p>
+              <h3 className="text-base font-bold text-slate-900">
+                {editFund ? 'Edit Capital Fund' : 'Record New Capital Fund'}
+              </h3>
+              <p className="text-xs text-slate-500">
+                {editFund ? 'Update central pool fund details' : 'Inflow from Investor / Director into Central Pool'}
+              </p>
             </div>
           </div>
           <button
@@ -225,10 +262,10 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({ isOpen, onClose, onS
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Recording...</span>
+                  <span>{editFund ? 'Updating...' : 'Recording...'}</span>
                 </>
               ) : (
-                <span>Record Inflow Fund</span>
+                <span>{editFund ? 'Update Fund' : 'Record Inflow Fund'}</span>
               )}
             </button>
           </div>

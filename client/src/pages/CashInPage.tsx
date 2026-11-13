@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlusCircle, Search, Trash2, ArrowDownRight, Paperclip, Loader2, RefreshCw, Calendar, Building2, Printer, Coins } from 'lucide-react';
+import { PlusCircle, Search, Trash2, ArrowDownRight, Paperclip, Loader2, RefreshCw, Calendar, Building2, Printer, Coins, Pencil } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Category } from '../types';
@@ -9,13 +9,14 @@ import { Pagination } from '../components/common/Pagination';
 import { ReceiptModal } from '../components/common/ReceiptModal';
 import { UndoToast } from '../components/common/UndoToast';
 import { PaymentVoucherModal } from '../components/common/PaymentVoucherModal';
+import { CashInModal } from '../components/modals/CashInModal';
 
 interface CashInPageProps {
   onOpenCreate: () => void;
 }
 
 export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
-  const { selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
+  const { companies, selectedCompanyId, refreshTrigger, triggerRefresh, activeCompanyName } = useFilters();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [totalAmount, setTotalAmount] = useState<string>('0.00');
@@ -27,6 +28,7 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; party: string; amount: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [undoSnapshot, setUndoSnapshot] = useState<any | null>(null);
@@ -386,6 +388,14 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
                       </button>
 
                       <button
+                        onClick={() => setEditingTx(tx)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                        title="Edit Cash In"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+
+                      <button
                         onClick={() => setDeleteTarget({ id: tx.id, party: tx.party || 'Record', amount: String(tx.amount) })}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title="Delete Cash In"
@@ -482,6 +492,13 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
                             <Printer className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => setEditingTx(tx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                            title="Edit Cash In"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => setDeleteTarget({ id: tx.id, party: tx.party || 'Record', amount: String(tx.amount) })}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Delete Cash In"
@@ -543,6 +560,21 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
         onClose={() => setActiveVoucher(null)}
         transaction={activeVoucher}
       />
+
+      {/* Edit Cash In Modal */}
+      {editingTx && (
+        <CashInModal
+          isOpen={!!editingTx}
+          onClose={() => setEditingTx(null)}
+          onSuccess={() => {
+            setEditingTx(null);
+            triggerRefresh();
+            fetchCashIn();
+          }}
+          companies={companies}
+          editTransaction={editingTx}
+        />
+      )}
 
       {/* Undo Toast Notification */}
       <UndoToast
