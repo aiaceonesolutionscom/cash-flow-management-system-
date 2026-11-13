@@ -11,7 +11,7 @@ const client_1 = require("@prisma/client");
 const audit_1 = require("../utils/audit");
 const createCashIn = async (req, res) => {
     try {
-        const { companyId, accountId, categoryId, categoryName, amount, party, paymentDate, referenceNo, description } = req.body;
+        const { companyId, accountId, categoryId, categoryName, amount, party, paymentDate, referenceNo, description, companyFundId } = req.body;
         if (!companyId || !accountId || (!categoryId && !categoryName) || !amount || !party || !paymentDate) {
             res.status(400).json({ success: false, message: 'All required fields must be provided' });
             return;
@@ -60,7 +60,29 @@ const createCashIn = async (req, res) => {
             if (!account) {
                 throw new Error('Selected account does not belong to the selected company');
             }
-            // 3. Create transaction record
+            // 3. If linked to CompanyFund, validate remaining balance & allocate
+            let resolvedFundId = null;
+            if (companyFundId && typeof companyFundId === 'string' && companyFundId.trim() && companyFundId !== 'none') {
+                resolvedFundId = companyFundId.trim();
+                const fund = await tx.companyFund.findUnique({ where: { id: resolvedFundId } });
+                if (!fund) {
+                    throw new Error('Selected Company Fund not found');
+                }
+                const remaining = Number(fund.totalAmount) - Number(fund.allocatedAmount);
+                if (amountDec.toNumber() > remaining) {
+                    throw new Error(`Allocation amount (PKR ${amountDec.toNumber().toLocaleString()}) exceeds remaining available fund balance (PKR ${remaining.toLocaleString()})`);
+                }
+                const newAllocated = Number(fund.allocatedAmount) + amountDec.toNumber();
+                const newStatus = newAllocated >= Number(fund.totalAmount) ? 'FULLY_ALLOCATED' : 'PARTIALLY_ALLOCATED';
+                await tx.companyFund.update({
+                    where: { id: resolvedFundId },
+                    data: {
+                        allocatedAmount: newAllocated,
+                        status: newStatus
+                    }
+                });
+            }
+            // 4. Create transaction record
             const transaction = await tx.transaction.create({
                 data: {
                     companyId,
@@ -72,12 +94,14 @@ const createCashIn = async (req, res) => {
                     paymentDate: new Date(paymentDate),
                     referenceNo: referenceNo?.trim() || null,
                     description: description?.trim() || null,
+                    companyFundId: resolvedFundId,
                 },
                 include: {
                     company: true,
                     account: true,
                     category: true,
-                    attachments: true
+                    attachments: true,
+                    companyFund: true
                 }
             });
             // 3. Atomically increase target account balance
@@ -187,7 +211,16 @@ const getCashInList = async (req, res) => {
                     company: { select: { id: true, name: true, code: true } },
                     account: { select: { id: true, name: true, type: true } },
                     category: { select: { id: true, name: true } },
-                    attachments: true
+                    attachments: true,
+                    companyFund: {
+                        select: {
+                            id: true,
+                            title: true,
+                            receivedFrom: true,
+                            attachmentUrl: true,
+                            attachmentName: true
+                        }
+                    }
                 },
                 orderBy: { paymentDate: 'desc' },
                 skip,
@@ -326,7 +359,22 @@ const deleteCashIn = async (req, res) => {
                     }
                 }
             });
-            // 2. Delete transaction (attachments cascade)
+            // 2. If linked to CompanyFund, reverse the allocated amount on the fund
+            if (existing.companyFundId) {
+                const fund = await tx.companyFund.findUnique({ where: { id: existing.companyFundId } });
+                if (fund) {
+                    const newAllocated = Math.max(0, Number(fund.allocatedAmount) - Number(existing.amount));
+                    const newStatus = newAllocated === 0 ? 'UNALLOCATED' : 'PARTIALLY_ALLOCATED';
+                    await tx.companyFund.update({
+                        where: { id: existing.companyFundId },
+                        data: {
+                            allocatedAmount: newAllocated,
+                            status: newStatus
+                        }
+                    });
+                }
+            }
+            // 3. Delete transaction (attachments cascade)
             await tx.transaction.delete({ where: { id } });
         });
         await (0, audit_1.createAuditLog)({

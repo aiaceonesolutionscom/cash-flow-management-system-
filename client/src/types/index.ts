@@ -62,6 +62,14 @@ export interface Transaction {
   account: { id: string; name: string; type: AccountType };
   category: { id: string; name: string; type?: CategoryType };
   attachments?: Attachment[];
+  companyFundId?: string | null;
+  companyFund?: {
+    id: string;
+    title: string;
+    receivedFrom: string;
+    attachmentUrl?: string | null;
+    attachmentName?: string | null;
+  } | null;
 }
 
 export interface Transfer {
@@ -148,4 +156,46 @@ export interface DashboardData {
   };
   recentTransactions: Transaction[];
   activeNotes?: CompanyNote[];
+}
+
+export type FundStatus = 'UNALLOCATED' | 'PARTIALLY_ALLOCATED' | 'FULLY_ALLOCATED';
+
+export interface FundAllocation {
+  transactionId: string;
+  companyId: string;
+  companyName: string;
+  companyCode: string;
+  accountId: string;
+  accountName: string;
+  accountType: AccountType;
+  amount: number;
+  paymentDate: string;
+  referenceNo?: string | null;
+  description?: string | null;
+}
+
+export interface CompanyFund {
+  id: string;
+  title: string;
+  totalAmount: number;
+  allocatedAmount: number;
+  remainingAmount: number;
+  receivedFrom: string;
+  receivingMethod?: string | null;
+  fundDate: string;
+  description?: string | null;
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
+  status: FundStatus;
+  createdAt: string;
+  updatedAt: string;
+  allocationsCount?: number;
+  allocations?: FundAllocation[];
+}
+
+export interface FundsSummary {
+  totalFundsReceived: number;
+  totalAllocated: number;
+  remainingPoolBalance: number;
+  totalCount: number;
 }

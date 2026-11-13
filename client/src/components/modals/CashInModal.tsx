@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ArrowDownRight, Upload, Loader2, ChevronDown, Check } from 'lucide-react';
+import { X, ArrowDownRight, Upload, Loader2, ChevronDown, Check, Coins } from 'lucide-react';
 import { api } from '../../services/api';
 import { Company, Account, Category } from '../../types';
+
+interface AvailableFundOption {
+  id: string;
+  title: string;
+  receivedFrom: string;
+  receivingMethod?: string;
+  totalAmount: number;
+  allocatedAmount: number;
+  remainingAmount: number;
+}
 
 interface CashInModalProps {
   isOpen: boolean;
@@ -9,6 +19,7 @@ interface CashInModalProps {
   onSuccess: () => void;
   companies: Company[];
   initialCompanyId?: string;
+  initialFundId?: string;
 }
 
 export const CashInModal: React.FC<CashInModalProps> = ({
@@ -16,7 +27,8 @@ export const CashInModal: React.FC<CashInModalProps> = ({
   onClose,
   onSuccess,
   companies,
-  initialCompanyId
+  initialCompanyId,
+  initialFundId
 }) => {
   const [companyId, setCompanyId] = useState<string>('');
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -27,6 +39,10 @@ export const CashInModal: React.FC<CashInModalProps> = ({
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState<boolean>(false);
   const catDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Available Funds Pool
+  const [availableFunds, setAvailableFunds] = useState<AvailableFundOption[]>([]);
+  const [selectedFundId, setSelectedFundId] = useState<string>('');
+
   const [amount, setAmount] = useState<string>('');
   const [party, setParty] = useState<string>('');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -36,19 +52,46 @@ export const CashInModal: React.FC<CashInModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
+  // Load available funds from pool
+  useEffect(() => {
+    if (isOpen) {
+      const fetchAvailableFunds = async () => {
+        try {
+          const res = await api.get('/funds/available');
+          if (res.data.success) {
+            setAvailableFunds(res.data.funds || []);
+            if (initialFundId) {
+              setSelectedFundId(initialFundId);
+              const found = res.data.funds.find((f: AvailableFundOption) => f.id === initialFundId);
+              if (found) {
+                setParty(found.receivedFrom);
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load available funds pool', e);
+        }
+      };
+      fetchAvailableFunds();
+    }
+  }, [isOpen, initialFundId]);
+
   useEffect(() => {
     if (isOpen) {
       const defComp = initialCompanyId && initialCompanyId !== 'all' ? initialCompanyId : companies[0]?.id || '';
       setCompanyId(defComp);
       setAmount('');
-      setParty('');
+      if (!initialFundId) {
+        setParty('');
+        setSelectedFundId('');
+      }
       setReferenceNo('');
       setDescription('');
       setReceiptFile(null);
       setError('');
       setIsCatDropdownOpen(false);
     }
-  }, [isOpen, initialCompanyId, companies]);
+  }, [isOpen, initialCompanyId, companies, initialFundId]);
 
   // Close category dropdown on outside click
   useEffect(() => {
@@ -118,6 +161,28 @@ export const CashInModal: React.FC<CashInModalProps> = ({
     setIsCatDropdownOpen(false);
   };
 
+  const handleFundSelection = (fundId: string) => {
+    setSelectedFundId(fundId);
+    if (!fundId) return;
+    const found = availableFunds.find((f) => f.id === fundId);
+    if (found) {
+      if (!party || party === 'Customer / Client Name' || party === '') {
+        setParty(found.receivedFrom);
+      }
+      // Auto-set Category to Company Funds if available
+      const fundCat = categories.find((c) => c.name.toLowerCase().includes('fund'));
+      if (fundCat) {
+        setCategoryId(fundCat.id);
+        setCategoryInput(fundCat.name);
+      } else if (!categoryInput.toLowerCase().includes('fund')) {
+        setCategoryInput('Company Funds');
+        setCategoryId('');
+      }
+    }
+  };
+
+  const selectedFund = availableFunds.find((f) => f.id === selectedFundId);
+
   const filteredCategories = categories.filter((c) =>
     c.name.toLowerCase().includes(categoryInput.toLowerCase())
   );
@@ -141,6 +206,14 @@ export const CashInModal: React.FC<CashInModalProps> = ({
       return;
     }
 
+    if (selectedFundId) {
+      const found = availableFunds.find((f) => f.id === selectedFundId);
+      if (found && parseFloat(amount) > found.remainingAmount) {
+        setError(`Entered amount (PKR ${parseFloat(amount).toLocaleString()}) exceeds available fund balance (PKR ${found.remainingAmount.toLocaleString()}).`);
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
       const formData = new FormData();
@@ -159,6 +232,7 @@ export const CashInModal: React.FC<CashInModalProps> = ({
       if (referenceNo) formData.append('referenceNo', referenceNo);
       if (description) formData.append('description', description);
       if (receiptFile) formData.append('receipt', receiptFile);
+      if (selectedFundId) formData.append('companyFundId', selectedFundId);
 
       const res = await api.post('/cash-in', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -343,6 +417,45 @@ export const CashInModal: React.FC<CashInModalProps> = ({
               />
             </div>
           </div>
+
+          {/* Dynamic Source Fund Pool Selector (Shown when Category is Company Funds, or when user links to master fund) */}
+          {(categoryInput.toLowerCase().includes('fund') || selectedFundId || availableFunds.length > 0) && (
+            <div className="p-3 bg-blue-50/90 border border-blue-200 rounded-xl space-y-2 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5 text-xs font-bold text-blue-900">
+                  <Coins className="w-4 h-4 text-blue-600" />
+                  <span>Source Capital Fund Pool (Multi-Company Allocation)</span>
+                </div>
+                {selectedFund && (
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Remaining: ₨ {selectedFund.remainingAmount.toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <select
+                value={selectedFundId}
+                onChange={(e) => handleFundSelection(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-white border border-blue-300 rounded-lg text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
+              >
+                <option value="">-- No Master Fund Link (Direct One-Off Inflow) --</option>
+                {availableFunds.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.receivedFrom} • {f.title} (Available: ₨ {f.remainingAmount.toLocaleString()})
+                  </option>
+                ))}
+              </select>
+              {selectedFund ? (
+                <div className="flex items-center justify-between text-[11px] text-blue-700 font-medium px-1 pt-0.5">
+                  <span>Total Fund: ₨ {selectedFund.totalAmount.toLocaleString()}</span>
+                  <span>Disbursed so far: ₨ {selectedFund.allocatedAmount.toLocaleString()}</span>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  Select an active master fund from the pool to automatically track remaining unspent balances.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Reference Number</label>

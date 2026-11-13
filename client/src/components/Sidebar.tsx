@@ -11,7 +11,8 @@ import {
   Settings,
   StickyNote,
   ArrowRightLeft,
-  ShieldCheck
+  ShieldCheck,
+  Coins
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -33,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'funds', label: 'Funds Pool', icon: Coins },
     { id: 'cash-in', label: 'Cash In', icon: ArrowDownRight },
     { id: 'cash-out', label: 'Cash Out', icon: ArrowUpRight },
     { id: 'transactions', label: 'Transactions', icon: ReceiptText },

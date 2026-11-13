@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlusCircle, Search, Trash2, ArrowDownRight, Paperclip, Loader2, RefreshCw, Calendar, Building2, Printer } from 'lucide-react';
+import { PlusCircle, Search, Trash2, ArrowDownRight, Paperclip, Loader2, RefreshCw, Calendar, Building2, Printer, Coins } from 'lucide-react';
 import { api, formatPKR } from '../services/api';
 import { useFilters } from '../context/FilterContext';
 import { Transaction, Category } from '../types';
@@ -335,6 +335,12 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
                       <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold">
                         {tx.category.name}
                       </span>
+                      {tx.companyFund && (
+                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">
+                          <Coins className="w-3 h-3 text-blue-500" />
+                          <span>Fund: {tx.companyFund.receivedFrom}</span>
+                        </span>
+                      )}
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
                         tx.account.type === 'CASH'
                           ? 'bg-emerald-50 text-emerald-700'
@@ -417,6 +423,12 @@ export const CashInPage: React.FC<CashInPageProps> = ({ onOpenCreate }) => {
                       <td className="py-3 px-4 font-medium text-slate-800">{tx.company.name}</td>
                       <td className="py-3 px-4 font-semibold text-slate-900">
                         <div>{tx.party}</div>
+                        {tx.companyFund && (
+                          <div className="text-[10px] text-blue-600 font-semibold flex items-center space-x-1 mt-0.5">
+                            <Coins className="w-3 h-3 shrink-0" />
+                            <span>Fund: {tx.companyFund.receivedFrom}</span>
+                          </div>
+                        )}
                         {tx.description && <div className="text-[10px] text-slate-400 font-normal">{tx.description}</div>}
                       </td>
                       <td className="py-3 px-4 text-slate-600">{tx.category.name}</td>

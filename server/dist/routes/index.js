@@ -51,6 +51,7 @@ const reportController = __importStar(require("../controllers/reportController")
 const auditController = __importStar(require("../controllers/auditController"));
 const attachmentController = __importStar(require("../controllers/attachmentController"));
 const companyNoteController = __importStar(require("../controllers/companyNoteController"));
+const fundController = __importStar(require("../controllers/fundController"));
 const router = (0, express_1.Router)();
 // Global API Request Rate Limiter (Protects against DoS & automated scrapers)
 router.use(rateLimiter_1.generalApiRateLimiter);
@@ -106,6 +107,12 @@ router.post('/company-notes', auth_1.requireAdmin, companyNoteController.createC
 router.put('/company-notes/:id', auth_1.requireAdmin, companyNoteController.updateCompanyNote);
 router.patch('/company-notes/:id/status', auth_1.requireAdmin, companyNoteController.updateCompanyNoteStatus);
 router.delete('/company-notes/:id', auth_1.requireAdmin, companyNoteController.deleteCompanyNote);
+// Company Funds Pool & Capital Injections
+router.get('/funds', auth_1.requireAdmin, fundController.getFunds);
+router.get('/funds/available', auth_1.requireAdmin, fundController.getAvailableFunds);
+router.post('/funds', auth_1.requireAdmin, upload_1.uploadReceipt.single('receipt'), fundController.createFund);
+router.put('/funds/:id', auth_1.requireAdmin, upload_1.uploadReceipt.single('receipt'), fundController.updateFund);
+router.delete('/funds/:id', auth_1.requireAdmin, fundController.deleteFund);
 // Attachments / Receipts (Streamed directly from PostgreSQL bytes - Strictly Protected)
 router.get('/attachments/:id/view', auth_1.requireAdmin, attachmentController.getAttachment);
 router.get('/attachments/:id/download', auth_1.requireAdmin, attachmentController.downloadAttachment);

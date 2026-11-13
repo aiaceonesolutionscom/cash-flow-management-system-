@@ -47,6 +47,12 @@ enum DemandStatus {
   CANCELLED
 }
 
+enum FundStatus {
+  UNALLOCATED
+  PARTIALLY_ALLOCATED
+  FULLY_ALLOCATED
+}
+
 model Admin {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -128,11 +134,15 @@ model Transaction {
   category    Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   attachments Attachment[]
 
+  companyFundId String?       @map("company_fund_id")
+  companyFund   CompanyFund?  @relation(fields: [companyFundId], references: [id], onDelete: SetNull)
+
   @@index([companyId])
   @@index([accountId])
   @@index([categoryId])
   @@index([paymentDate])
   @@index([type])
+  @@index([companyFundId])
   @@map("transactions")
 }
 
@@ -222,5 +232,27 @@ model CompanyNoteItem {
 
   @@index([noteId])
   @@map("company_note_items")
+}
+
+model CompanyFund {
+  id              String        @id @default(uuid())
+  title           String
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(15, 2)
+  allocatedAmount Decimal       @default(0) @map("allocated_amount") @db.Decimal(15, 2)
+  receivedFrom    String        @map("received_from")
+  receivingMethod String?       @map("receiving_method")
+  fundDate        DateTime      @default(now()) @map("fund_date")
+  description     String?
+  attachmentUrl   String?       @map("attachment_url")
+  attachmentName  String?       @map("attachment_name")
+  status          FundStatus    @default(UNALLOCATED)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  transactions    Transaction[]
+
+  @@index([status])
+  @@index([fundDate])
+  @@map("company_funds")
 }
 

@@ -14,6 +14,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { CompanyNotesPage } from './pages/CompanyNotesPage';
 import { TransfersPage } from './pages/TransfersPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
+import { FundsPage } from './pages/FundsPage';
 
 // Quick Action Modals
 import { CashInModal } from './components/modals/CashInModal';
@@ -63,6 +64,8 @@ const MainLayout: React.FC = () => {
     switch (currentTab) {
       case 'dashboard':
         return <DashboardPage />;
+      case 'funds':
+        return <FundsPage companies={companies} />;
       case 'cash-in':
         return <CashInPage onOpenCreate={() => setIsCashInOpen(true)} />;
       case 'cash-out':

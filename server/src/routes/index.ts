@@ -17,6 +17,7 @@ import * as reportController from '../controllers/reportController';
 import * as auditController from '../controllers/auditController';
 import * as attachmentController from '../controllers/attachmentController';
 import * as companyNoteController from '../controllers/companyNoteController';
+import * as fundController from '../controllers/fundController';
 
 const router = Router();
 
@@ -86,6 +87,13 @@ router.post('/company-notes', requireAdmin, companyNoteController.createCompanyN
 router.put('/company-notes/:id', requireAdmin, companyNoteController.updateCompanyNote);
 router.patch('/company-notes/:id/status', requireAdmin, companyNoteController.updateCompanyNoteStatus);
 router.delete('/company-notes/:id', requireAdmin, companyNoteController.deleteCompanyNote);
+
+// Company Funds Pool & Capital Injections
+router.get('/funds', requireAdmin, fundController.getFunds);
+router.get('/funds/available', requireAdmin, fundController.getAvailableFunds);
+router.post('/funds', requireAdmin, uploadReceipt.single('receipt'), fundController.createFund);
+router.put('/funds/:id', requireAdmin, uploadReceipt.single('receipt'), fundController.updateFund);
+router.delete('/funds/:id', requireAdmin, fundController.deleteFund);
 
 // Attachments / Receipts (Streamed directly from PostgreSQL bytes - Strictly Protected)
 router.get('/attachments/:id/view', requireAdmin, attachmentController.getAttachment);

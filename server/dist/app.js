@@ -39,6 +39,12 @@ const createApp = () => {
     app.use(express_1.default.urlencoded({ extended: true, limit: '2mb' }));
     // Mount API Routes
     app.use('/api', routes_1.default);
+    // Serve Uploaded Receipts & Slips
+    const uploadsDir = path_1.default.join(process.cwd(), 'uploads');
+    if (!fs_1.default.existsSync(uploadsDir)) {
+        fs_1.default.mkdirSync(uploadsDir, { recursive: true });
+    }
+    app.use('/uploads', express_1.default.static(uploadsDir));
     // Health check endpoint
     app.get('/health', (_req, res) => {
         res.json({ status: 'ok', timestamp: new Date().toISOString() });
