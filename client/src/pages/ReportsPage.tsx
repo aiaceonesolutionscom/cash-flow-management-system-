@@ -657,22 +657,77 @@ export const ReportsPage: React.FC = () => {
                                 {formatPKR(f.totalAmount)}
                               </td>
                             </tr>
-                            {f.allocations && f.allocations.length > 0 && (
-                              <tr className="bg-slate-50/60">
-                                <td colSpan={8} className="py-2.5 px-6">
-                                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    Allocations to Companies:
+                            {f.allocations && f.allocations.length > 0 ? (
+                              <tr className="bg-slate-50/80 border-b border-slate-200">
+                                <td colSpan={8} className="py-3 px-6">
+                                  <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-2">
+                                      <span className="font-bold uppercase tracking-wider text-slate-700 flex items-center space-x-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                        <span>Company Distributions Breakdown ({f.allocations.length})</span>
+                                      </span>
+                                      <span className="text-[11px] text-slate-500">
+                                        Distributed: <strong className="text-emerald-700 font-bold">{formatPKR(f.allocatedAmount)}</strong> of {formatPKR(f.totalAmount)}
+                                      </span>
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-left text-xs min-w-[620px]">
+                                        <thead className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 border-b border-slate-100">
+                                          <tr>
+                                            <th className="py-1.5 px-3">Date</th>
+                                            <th className="py-1.5 px-3">Distributed To</th>
+                                            <th className="py-1.5 px-3">Account / Method</th>
+                                            <th className="py-1.5 px-3">Category</th>
+                                            <th className="py-1.5 px-3">Reference / Notes</th>
+                                            <th className="py-1.5 px-3 text-right">Amount (PKR)</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {f.allocations.map((a: any) => (
+                                            <tr key={a.id} className="hover:bg-slate-50/50">
+                                              <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
+                                                {format(new Date(a.paymentDate), 'dd MMM yyyy')}
+                                              </td>
+                                              <td className="py-2 px-3 font-bold text-slate-800 whitespace-nowrap">
+                                                {a.companyName}
+                                              </td>
+                                              <td className="py-2 px-3 text-slate-600 whitespace-nowrap">
+                                                {a.accountName}
+                                              </td>
+                                              <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
+                                                {a.categoryName || 'Company Funds'}
+                                              </td>
+                                              <td className="py-2 px-3 text-slate-400 text-[11px] truncate max-w-xs">
+                                                {a.referenceNo || a.description || '—'}
+                                              </td>
+                                              <td className="py-2 px-3 text-right font-bold text-emerald-600 whitespace-nowrap">
+                                                {formatPKR(a.amount)}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 bg-emerald-50/50 -mx-3 -mb-3 p-2.5 rounded-b-lg">
+                                      <span>
+                                        Capital Inflow: <strong className="text-slate-900">{formatPKR(f.totalAmount)}</strong>
+                                      </span>
+                                      <span>
+                                        Total Distributed: <strong className="text-emerald-700 font-bold">{formatPKR(f.allocatedAmount)}</strong>
+                                      </span>
+                                      <span>
+                                        Remaining in Pool: <strong className="text-blue-700 font-bold">{formatPKR(f.remainingAmount)}</strong>
+                                      </span>
+                                    </div>
                                   </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {f.allocations.map((a: any) => (
-                                      <div key={a.id} className="inline-flex items-center space-x-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px]">
-                                        <span className="font-bold text-slate-800">{a.companyName}</span>
-                                        <span className="text-slate-400">({a.accountName})</span>
-                                        <span className="font-extrabold text-emerald-600">PKR {Number(a.amount).toLocaleString()}</span>
-                                        <span className="text-slate-400 text-[10px]">• {format(new Date(a.paymentDate), 'dd MMM')}</span>
-                                      </div>
-                                    ))}
-                                  </div>
+                                </td>
+                              </tr>
+                            ) : (
+                              <tr className="bg-slate-50/40">
+                                <td colSpan={8} className="py-2 px-6 text-[11px] text-slate-400 italic">
+                                  ⚡ No distributions recorded yet — Full {formatPKR(f.totalAmount)} is unallocated and available in the funds pool.
                                 </td>
                               </tr>
                             )}

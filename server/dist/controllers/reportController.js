@@ -158,7 +158,8 @@ const getFinancialReport = async (req, res) => {
                     transactions: {
                         include: {
                             company: { select: { id: true, name: true, code: true } },
-                            account: { select: { id: true, name: true, type: true } }
+                            account: { select: { id: true, name: true, type: true } },
+                            category: { select: { id: true, name: true } }
                         },
                         orderBy: { paymentDate: 'desc' }
                     }
@@ -192,6 +193,7 @@ const getFinancialReport = async (req, res) => {
                         id: tx.id,
                         companyName: tx.company.name,
                         accountName: tx.account.name,
+                        categoryName: tx.category?.name || 'Company Funds',
                         amount: Number(tx.amount).toFixed(2),
                         paymentDate: tx.paymentDate,
                         referenceNo: tx.referenceNo,
@@ -412,7 +414,8 @@ const exportReportExcel = async (req, res) => {
                     transactions: {
                         include: {
                             company: true,
-                            account: true
+                            account: true,
+                            category: true
                         },
                         orderBy: { paymentDate: 'desc' }
                     }
@@ -487,8 +490,10 @@ const exportReportExcel = async (req, res) => {
             allocSheet.columns = [
                 { header: 'Allocation Date', key: 'date', width: 14 },
                 { header: 'Fund Title', key: 'fundTitle', width: 28 },
+                { header: 'Investor / Source', key: 'source', width: 22 },
                 { header: 'Receiving Company', key: 'company', width: 26 },
                 { header: 'Receiving Account', key: 'account', width: 20 },
+                { header: 'Category', key: 'category', width: 22 },
                 { header: 'Allocated Amount (PKR)', key: 'amount', width: 22 },
                 { header: 'Reference #', key: 'ref', width: 18 },
                 { header: 'Description / Notes', key: 'notes', width: 30 }
@@ -507,8 +512,10 @@ const exportReportExcel = async (req, res) => {
                     const row = allocSheet.addRow({
                         date: (0, date_fns_1.format)(tx.paymentDate, 'yyyy-MM-dd'),
                         fundTitle: f.title,
+                        source: f.receivedFrom,
                         company: tx.company.name,
                         account: tx.account.name,
+                        category: tx.category?.name || 'Company Funds',
                         amount: Number(tx.amount),
                         ref: tx.referenceNo || '—',
                         notes: tx.description || '—'
@@ -751,7 +758,7 @@ const exportReportPDF = async (req, res) => {
                 where: fundWhere,
                 include: {
                     transactions: {
-                        include: { company: true, account: true },
+                        include: { company: true, account: true, category: true },
                         orderBy: { paymentDate: 'desc' }
                     }
                 },
@@ -779,71 +786,107 @@ const exportReportPDF = async (req, res) => {
             doc.pipe(res);
             const pageWidth = doc.page.width;
             const contentWidth = pageWidth - 72;
-            const drawFundHeader = (y) => {
-                doc.rect(36, y, contentWidth, 20).fill('#1e40af');
-                doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
-                doc.text('Date', 42, y + 5, { width: 65 });
-                doc.text('Fund Title', 112, y + 5, { width: 130 });
-                doc.text('Source / Investor', 248, y + 5, { width: 110 });
-                doc.text('Payment Method', 364, y + 5, { width: 95 });
-                doc.text('Status', 465, y + 5, { width: 85 });
-                doc.text('Allocated (PKR)', 555, y + 5, { width: 75, align: 'right' });
-                doc.text('Remaining (PKR)', 635, y + 5, { width: 75, align: 'right' });
-                doc.text('Total Fund (PKR)', 715, y + 5, { width: 83, align: 'right' });
-            };
-            // Title
+            // Title & Subtitle
             doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold').text('CASHFLOW FINANCIAL MANAGEMENT SYSTEM', 36, 32);
-            doc.fontSize(10).font('Helvetica').fillColor('#64748b').text(`Central Funds Pool & Multi-Company Allocations Statement  •  Generated: ${(0, date_fns_1.format)(new Date(), 'dd MMMM yyyy, hh:mm a')}`, 36, 52);
-            // KPI Cards
+            doc.fontSize(9.5).font('Helvetica').fillColor('#64748b').text(`Company Funds Statement & Distribution Breakdown  •  Generated: ${(0, date_fns_1.format)(new Date(), 'dd MMMM yyyy, hh:mm a')}`, 36, 52);
+            // Top KPI Summary Cards
             const kpiY = 70;
             const cardWidth = (contentWidth - 24) / 4;
             // Card 1: Total Injected
             doc.rect(36, kpiY, cardWidth, 42).fillAndStroke('#eff6ff', '#bfdbfe');
-            doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold').text('TOTAL FUNDS INJECTED', 44, kpiY + 8);
+            doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold').text('TOTAL CAPITAL INFLOW', 44, kpiY + 8);
             doc.fillColor('#2563eb').fontSize(11).font('Helvetica-Bold').text(`PKR ${totalInjected.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 44, kpiY + 22);
             // Card 2: Distributed to Companies
             doc.rect(36 + cardWidth + 8, kpiY, cardWidth, 42).fillAndStroke('#ecfdf5', '#a7f3d0');
             doc.fillColor('#065f46').fontSize(8).font('Helvetica-Bold').text('DISTRIBUTED TO COMPANIES', 36 + cardWidth + 16, kpiY + 8);
             doc.fillColor('#059669').fontSize(11).font('Helvetica-Bold').text(`PKR ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 36 + cardWidth + 16, kpiY + 22);
             // Card 3: Remaining Pool Balance
-            doc.rect(36 + (cardWidth + 8) * 2, kpiY, cardWidth, 42).fillAndStroke('#eff6ff', '#bfdbfe');
-            doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold').text('REMAINING AVAILABLE POOL', 36 + (cardWidth + 8) * 2 + 8, kpiY + 8);
-            doc.fillColor('#1e40af').fontSize(11).font('Helvetica-Bold').text(`PKR ${totalRemaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 36 + (cardWidth + 8) * 2 + 8, kpiY + 22);
+            doc.rect(36 + (cardWidth + 8) * 2, kpiY, cardWidth, 42).fillAndStroke('#fef3c7', '#fde68a');
+            doc.fillColor('#92400e').fontSize(8).font('Helvetica-Bold').text('REMAINING UNSPENT POOL', 36 + (cardWidth + 8) * 2 + 8, kpiY + 8);
+            doc.fillColor('#b45309').fontSize(11).font('Helvetica-Bold').text(`PKR ${totalRemaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 36 + (cardWidth + 8) * 2 + 8, kpiY + 22);
             // Card 4: Total Inflows Count
             doc.rect(36 + (cardWidth + 8) * 3, kpiY, cardWidth, 42).fillAndStroke('#f8fafc', '#e2e8f0');
             doc.fillColor('#475569').fontSize(8).font('Helvetica-Bold').text('TOTAL INFLOW FUNDS', 36 + (cardWidth + 8) * 3 + 8, kpiY + 8);
             doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text(`${funds.length} Inflow Funds`, 36 + (cardWidth + 8) * 3 + 8, kpiY + 22);
             let currentY = 126;
-            drawFundHeader(currentY);
-            currentY += 20;
-            doc.font('Helvetica').fontSize(8);
-            funds.forEach((f, idx) => {
-                if (currentY > 510) {
-                    doc.addPage();
-                    currentY = 36;
-                    drawFundHeader(currentY);
-                    currentY += 20;
-                    doc.font('Helvetica').fontSize(8);
-                }
-                if (idx % 2 === 0) {
-                    doc.rect(36, currentY, contentWidth, 20).fill('#f8fafc');
-                }
-                doc.fillColor('#334155');
-                doc.text((0, date_fns_1.format)(f.fundDate, 'yyyy-MM-dd'), 42, currentY + 5, { width: 65 });
-                doc.font('Helvetica-Bold').text(f.title.slice(0, 24), 112, currentY + 5, { width: 130 });
-                doc.font('Helvetica').text(f.receivedFrom.slice(0, 20), 248, currentY + 5, { width: 110 });
-                doc.text((f.receivingMethod || '—').slice(0, 16), 364, currentY + 5, { width: 95 });
-                // Status
-                doc.font('Helvetica-Bold').fillColor(f.status === 'FULLY_ALLOCATED' ? '#059669' : f.status === 'PARTIALLY_ALLOCATED' ? '#d97706' : '#2563eb');
-                doc.text(f.status, 465, currentY + 5, { width: 85 });
-                // Numbers
+            const drawSubTableHeader = (y, fundTitle) => {
+                doc.rect(36, y, contentWidth, 16).fill('#f1f5f9');
+                doc.fillColor('#475569').fontSize(7.5).font('Helvetica-Bold');
+                doc.text('Distribution Date', 44, y + 4, { width: 75 });
+                doc.text('Distributed To (Company)', 125, y + 4, { width: 175 });
+                doc.text('Receiving Account', 305, y + 4, { width: 105 });
+                doc.text('Category', 415, y + 4, { width: 105 });
+                doc.text('Reference # / Notes', 525, y + 4, { width: 125 });
+                doc.text('Distributed Amount (PKR)', 655, y + 4, { width: 142, align: 'right' });
+            };
+            funds.forEach((f) => {
                 const tot = Number(f.totalAmount);
                 const alloc = Number(f.allocatedAmount);
                 const rem = tot - alloc;
-                doc.font('Helvetica').fillColor('#059669').text(alloc.toLocaleString('en-US', { minimumFractionDigits: 2 }), 555, currentY + 5, { width: 75, align: 'right' });
-                doc.fillColor('#1e40af').text(rem.toLocaleString('en-US', { minimumFractionDigits: 2 }), 635, currentY + 5, { width: 75, align: 'right' });
-                doc.font('Helvetica-Bold').fillColor('#0f172a').text(tot.toLocaleString('en-US', { minimumFractionDigits: 2 }), 715, currentY + 5, { width: 83, align: 'right' });
-                currentY += 20;
+                const txList = f.transactions || [];
+                // Estimate block height
+                const minBlockHeight = 24 + (txList.length > 0 ? 16 + txList.length * 17 + 20 : 22) + 12;
+                if (currentY + Math.min(minBlockHeight, 100) > 520) {
+                    doc.addPage();
+                    currentY = 36;
+                }
+                // 1. Fund Header Banner
+                doc.rect(36, currentY, contentWidth, 24).fill('#1e3a8a');
+                doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
+                const fundDateStr = (0, date_fns_1.format)(f.fundDate, 'yyyy-MM-dd');
+                doc.text(`FUND: ${f.title}`, 44, currentY + 7, { width: 220 });
+                doc.fontSize(8).font('Helvetica');
+                doc.text(`From: ${f.receivedFrom}  |  Method: ${f.receivingMethod || '—'}  |  Date: ${fundDateStr}`, 270, currentY + 8, { width: 280 });
+                // Status Tag
+                const statusText = f.status === 'FULLY_ALLOCATED' ? 'FULLY ALLOCATED' : f.status === 'PARTIALLY_ALLOCATED' ? 'PARTIALLY ALLOCATED' : 'UNALLOCATED';
+                doc.font('Helvetica-Bold').fontSize(8).text(`[${statusText}]`, 560, currentY + 8, { width: 110 });
+                // Total Inflow Amount
+                doc.fontSize(9.5).font('Helvetica-Bold').text(`PKR ${tot.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 660, currentY + 7, { width: 137, align: 'right' });
+                currentY += 24;
+                // 2. Distributions Breakdown
+                if (txList.length > 0) {
+                    drawSubTableHeader(currentY, f.title);
+                    currentY += 16;
+                    txList.forEach((tx, tIdx) => {
+                        if (currentY > 525) {
+                            doc.addPage();
+                            currentY = 36;
+                            drawSubTableHeader(currentY, f.title);
+                            currentY += 16;
+                        }
+                        if (tIdx % 2 === 0) {
+                            doc.rect(36, currentY, contentWidth, 17).fill('#fafafa');
+                        }
+                        doc.fillColor('#334155').fontSize(7.5).font('Helvetica');
+                        doc.text((0, date_fns_1.format)(tx.paymentDate, 'yyyy-MM-dd'), 44, currentY + 4, { width: 75 });
+                        doc.font('Helvetica-Bold').fillColor('#0f172a').text(tx.company.name.slice(0, 32), 125, currentY + 4, { width: 175 });
+                        doc.font('Helvetica').fillColor('#475569').text(tx.account.name.slice(0, 18), 305, currentY + 4, { width: 105 });
+                        doc.text((tx.category?.name || 'Company Funds').slice(0, 18), 415, currentY + 4, { width: 105 });
+                        doc.text((tx.referenceNo || tx.description || '—').slice(0, 24), 525, currentY + 4, { width: 125 });
+                        const txAmt = Number(tx.amount);
+                        doc.font('Helvetica-Bold').fillColor('#059669').text(`PKR ${txAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 655, currentY + 4, { width: 142, align: 'right' });
+                        currentY += 17;
+                    });
+                    // Fund Subtotal / Summary Bar
+                    if (currentY > 520) {
+                        doc.addPage();
+                        currentY = 36;
+                    }
+                    doc.rect(36, currentY, contentWidth, 20).fill('#ecfdf5');
+                    doc.rect(36, currentY, contentWidth, 20).stroke('#a7f3d0');
+                    doc.fillColor('#065f46').fontSize(8).font('Helvetica-Bold');
+                    doc.text(`Distribution Summary: Total Inflow: PKR ${tot.toLocaleString('en-US', { minimumFractionDigits: 2 })}   •   Distributed: PKR ${alloc.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${txList.length} allocation${txList.length > 1 ? 's' : ''})   •   Remaining Available Balance: PKR ${rem.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 44, currentY + 5, { width: contentWidth - 16 });
+                    currentY += 20;
+                }
+                else {
+                    // Zero distributions recorded yet
+                    doc.rect(36, currentY, contentWidth, 20).fill('#f8fafc');
+                    doc.rect(36, currentY, contentWidth, 20).stroke('#e2e8f0');
+                    doc.fillColor('#64748b').fontSize(8).font('Helvetica');
+                    doc.text(`⚡ No distributions recorded yet — Full capital amount of PKR ${tot.toLocaleString('en-US', { minimumFractionDigits: 2 })} remains completely unallocated and available in pool.`, 44, currentY + 6, { width: contentWidth - 16 });
+                    currentY += 20;
+                }
+                currentY += 10; // Spacing before next fund
             });
             const range = doc.bufferedPageRange();
             for (let i = 0; i < range.count; i++) {
