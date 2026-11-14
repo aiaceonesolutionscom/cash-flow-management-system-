@@ -6,6 +6,9 @@ import { startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, en
 import { Decimal } from 'decimal.js';
 
 function getDateRange(range?: string, customStart?: string, customEnd?: string): { gte?: Date; lte?: Date } {
+  if (!range || range === 'all' || range === 'all_time') {
+    return {};
+  }
   const now = new Date();
   switch (range) {
     case 'today':
@@ -47,9 +50,16 @@ export const getDashboardSummary = async (req: Request, res: Response): Promise<
       whereAcc.companyId = companyId as string;
     }
 
-    const dateFilter = getDateRange(dateRange as string, startDate as string, endDate as string);
-    if (dateFilter.gte || dateFilter.lte) {
-      whereTx.paymentDate = dateFilter;
+    if (startDate && endDate) {
+      whereTx.paymentDate = {
+        gte: new Date(startDate as string),
+        lte: new Date(new Date(endDate as string).setHours(23, 59, 59, 999))
+      };
+    } else if (dateRange && dateRange !== 'all' && dateRange !== 'all_time') {
+      const dateFilter = getDateRange(dateRange as string, startDate as string, endDate as string);
+      if (dateFilter.gte || dateFilter.lte) {
+        whereTx.paymentDate = dateFilter;
+      }
     }
 
     // 1. Calculate Transactions Totals (Cash In, Cash Out, Expenses)
@@ -175,15 +185,20 @@ export const getDashboardSummary = async (req: Request, res: Response): Promise<
       })
     );
 
-    // 6. Recent Transactions
+    // 6. Recent Transactions (Always query latest activities for the selected company/all)
+    const recentTxWhere: any = {};
+    if (companyId && companyId !== 'all') {
+      recentTxWhere.companyId = companyId as string;
+    }
+
     const recentTransactions = await prisma.transaction.findMany({
-      where: whereTx,
+      where: recentTxWhere,
       include: {
         company: { select: { name: true, code: true } },
         account: { select: { name: true, type: true } },
         category: { select: { name: true } }
       },
-      orderBy: { paymentDate: 'desc' },
+      orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
       take: 8
     });
 

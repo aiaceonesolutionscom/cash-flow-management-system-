@@ -19,7 +19,7 @@ import { SearchableSelect } from '../components/common/SearchableSelect';
 export const ReportsPage: React.FC = () => {
   const { selectedCompanyId, refreshTrigger, activeCompanyName } = useFilters();
   const [reportType, setReportType] = useState<string>('cash_flow');
-  const [reportPeriod, setReportPeriod] = useState<string>('this_month');
+  const [reportPeriod, setReportPeriod] = useState<string>('all_time');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [accountType, setAccountType] = useState<string>('all');
@@ -134,7 +134,7 @@ export const ReportsPage: React.FC = () => {
   };
 
   const resetAllFilters = () => {
-    setReportPeriod('this_month');
+    setReportPeriod('all_time');
     setAccountType('all');
     setCategoryFilter('all');
     setTxTypeFilter('all');
@@ -263,11 +263,11 @@ export const ReportsPage: React.FC = () => {
               onChange={(e) => setReportPeriod(e.target.value)}
               className="w-full text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium cursor-pointer"
             >
-              <option value="today">Today</option>
+              <option value="all_time">All Time (All Over)</option>
               <option value="this_month">This Month</option>
+              <option value="today">Today</option>
               <option value="last_month">Last Month</option>
               <option value="this_year">This Year</option>
-              <option value="all_time">All Time</option>
               <option value="custom">Custom Range</option>
             </select>
           </div>

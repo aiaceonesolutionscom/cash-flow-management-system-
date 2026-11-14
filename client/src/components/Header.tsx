@@ -101,10 +101,11 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => handleDateRangeChange(e.target.value)}
                 className="pl-8 pr-7 py-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
               >
+                <option value="all">All Time (All Over)</option>
+                <option value="this_month">This Month</option>
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>
                 <option value="this_week">This Week</option>
-                <option value="this_month">This Month</option>
                 <option value="last_month">Last Month</option>
                 <option value="this_year">This Year</option>
                 <option value="custom">Custom Range</option>
@@ -262,10 +263,11 @@ export const Header: React.FC<HeaderProps> = ({
               onChange={(e) => handleDateRangeChange(e.target.value)}
               className="w-full pl-8 pr-7 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer truncate"
             >
+              <option value="all">All Time (All Over)</option>
+              <option value="this_month">This Month</option>
               <option value="today">Today</option>
               <option value="yesterday">Yesterday</option>
               <option value="this_week">This Week</option>
-              <option value="this_month">This Month</option>
               <option value="last_month">Last Month</option>
               <option value="this_year">This Year</option>
               <option value="custom">Custom Range</option>

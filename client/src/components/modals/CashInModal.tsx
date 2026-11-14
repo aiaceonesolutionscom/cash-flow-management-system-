@@ -153,7 +153,7 @@ export const CashInModal: React.FC<CashInModalProps> = ({
           if (accRes.data.accounts.length > 0) {
             if (editTransaction?.accountId && accRes.data.accounts.some((a: any) => a.id === editTransaction.accountId)) {
               setAccountId(editTransaction.accountId);
-            } else {
+            } else if (!accountId || !accRes.data.accounts.some((a: any) => a.id === accountId)) {
               setAccountId(accRes.data.accounts[0].id);
             }
           }
@@ -161,9 +161,20 @@ export const CashInModal: React.FC<CashInModalProps> = ({
         if (catRes.data.success) {
           const cats: Category[] = catRes.data.categories;
           setCategories(cats);
-          if (editTransaction?.categoryId) {
-            setCategoryId(editTransaction.categoryId);
-            setCategoryInput(editTransaction.category?.name || '');
+          if (editTransaction) {
+            if (editTransaction.categoryId) {
+              setCategoryId(editTransaction.categoryId);
+              setCategoryInput(editTransaction.category?.name || '');
+            } else if (editTransaction.category?.name) {
+              const matched = cats.find((c) => c.name.toLowerCase() === editTransaction.category?.name.toLowerCase());
+              if (matched) {
+                setCategoryId(matched.id);
+                setCategoryInput(matched.name);
+              } else {
+                setCategoryId('');
+                setCategoryInput(editTransaction.category.name);
+              }
+            }
           } else if (initialFundId || selectedFundId) {
             const fundCat = cats.find((c) => c.name.toLowerCase().includes('fund'));
             if (fundCat) {
@@ -252,11 +263,12 @@ export const CashInModal: React.FC<CashInModalProps> = ({
 
       const formData = new FormData();
       formData.append('companyId', companyId);
-      formData.append('accountId', accountId);
+      formData.append('accountId', accountId || (editTransaction?.accountId || ''));
 
       if (categoryId) {
         formData.append('categoryId', categoryId);
-      } else {
+      }
+      if (finalCatName) {
         formData.append('categoryName', finalCatName);
       }
 
@@ -410,7 +422,10 @@ export const CashInModal: React.FC<CashInModalProps> = ({
               <select
                 value={companyId}
                 onChange={(e) => setCompanyId(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                disabled={!!editTransaction}
+                className={`w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  editTransaction ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''
+                }`}
               >
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>

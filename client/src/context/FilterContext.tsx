@@ -23,7 +23,7 @@ const FilterContext = createContext<FilterContextType | undefined>(undefined);
 export const FilterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
-  const [dateRange, setDateRange] = useState<string>('this_month');
+  const [dateRange, setDateRange] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [companies, setCompanies] = useState<Company[]>([]);

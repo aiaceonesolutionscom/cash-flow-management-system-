@@ -7,6 +7,9 @@ const client_1 = require("@prisma/client");
 const date_fns_1 = require("date-fns");
 const decimal_js_1 = require("decimal.js");
 function getDateRange(range, customStart, customEnd) {
+    if (!range || range === 'all' || range === 'all_time') {
+        return {};
+    }
     const now = new Date();
     switch (range) {
         case 'today':
@@ -44,9 +47,17 @@ const getDashboardSummary = async (req, res) => {
             whereTx.companyId = companyId;
             whereAcc.companyId = companyId;
         }
-        const dateFilter = getDateRange(dateRange, startDate, endDate);
-        if (dateFilter.gte || dateFilter.lte) {
-            whereTx.paymentDate = dateFilter;
+        if (startDate && endDate) {
+            whereTx.paymentDate = {
+                gte: new Date(startDate),
+                lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+            };
+        }
+        else if (dateRange && dateRange !== 'all' && dateRange !== 'all_time') {
+            const dateFilter = getDateRange(dateRange, startDate, endDate);
+            if (dateFilter.gte || dateFilter.lte) {
+                whereTx.paymentDate = dateFilter;
+            }
         }
         // 1. Calculate Transactions Totals (Cash In, Cash Out, Expenses)
         const [cashInAgg, cashOutAgg] = await Promise.all([
@@ -157,15 +168,19 @@ const getDashboardSummary = async (req, res) => {
                 balance: bal
             };
         }));
-        // 6. Recent Transactions
+        // 6. Recent Transactions (Always query latest activities for the selected company/all)
+        const recentTxWhere = {};
+        if (companyId && companyId !== 'all') {
+            recentTxWhere.companyId = companyId;
+        }
         const recentTransactions = await prisma_1.prisma.transaction.findMany({
-            where: whereTx,
+            where: recentTxWhere,
             include: {
                 company: { select: { name: true, code: true } },
                 account: { select: { name: true, type: true } },
                 category: { select: { name: true } }
             },
-            orderBy: { paymentDate: 'desc' },
+            orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
             take: 8
         });
         // 7. Company Funds Injected (Category: "Company Funds")

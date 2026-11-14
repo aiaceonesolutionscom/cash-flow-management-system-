@@ -374,7 +374,18 @@ export const getCashInList = async (req: Request, res: Response): Promise<void> 
 export const updateCashIn = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { companyId, accountId, categoryId, amount, party, paymentDate, referenceNo, description } = req.body;
+    const {
+      companyId,
+      accountId,
+      categoryId,
+      categoryName,
+      amount,
+      party,
+      paymentDate,
+      referenceNo,
+      description,
+      companyFundId
+    } = req.body;
 
     const existing = await prisma.transaction.findUnique({
       where: { id },
@@ -392,8 +403,41 @@ export const updateCashIn = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    const targetCompanyId = companyId || existing.companyId;
+
     const updated = await prisma.$transaction(async (tx) => {
-      // 1. Revert previous amount from existing account
+      // 1. Resolve or create category if categoryName is provided
+      let targetCategoryId = categoryId;
+      if (categoryName && categoryName.trim()) {
+        const trimmedCat = categoryName.trim();
+        const existingCat = await tx.category.findFirst({
+          where: {
+            name: { equals: trimmedCat, mode: 'insensitive' },
+            type: 'INCOME',
+            OR: [
+              { companyId: targetCompanyId },
+              { companyId: null }
+            ]
+          }
+        });
+        if (existingCat) {
+          targetCategoryId = existingCat.id;
+        } else {
+          const newCat = await tx.category.create({
+            data: {
+              name: trimmedCat,
+              type: 'INCOME',
+              companyId: targetCompanyId
+            }
+          });
+          targetCategoryId = newCat.id;
+        }
+      }
+
+      // 2. Resolve target account
+      const targetAccountId = accountId || existing.accountId;
+
+      // Revert previous amount from old account
       await tx.account.update({
         where: { id: existing.accountId },
         data: {
@@ -403,8 +447,7 @@ export const updateCashIn = async (req: Request, res: Response): Promise<void> =
         }
       });
 
-      // 2. Add new amount to target account (may be same or new account)
-      const targetAccountId = accountId || existing.accountId;
+      // Add new amount to target account
       await tx.account.update({
         where: { id: targetAccountId },
         data: {
@@ -414,7 +457,7 @@ export const updateCashIn = async (req: Request, res: Response): Promise<void> =
         }
       });
 
-      // 2b. If linked to CompanyFund, sync fund allocated amount and status
+      // 3. If linked to CompanyFund, sync fund allocated amount and status
       if (existing.companyFundId) {
         const diff = newAmountDec.minus(existing.amount);
         const fund = await tx.companyFund.findUnique({ where: { id: existing.companyFundId } });
@@ -435,24 +478,26 @@ export const updateCashIn = async (req: Request, res: Response): Promise<void> =
         }
       }
 
-      // 3. Update transaction record
+      // 4. Update transaction record
       const txn = await tx.transaction.update({
         where: { id },
         data: {
-          companyId: companyId || existing.companyId,
+          companyId: targetCompanyId,
           accountId: targetAccountId,
-          categoryId: categoryId || existing.categoryId,
+          categoryId: targetCategoryId || categoryId || existing.categoryId,
           amount: newAmountDec,
           party: party ? party.trim() : existing.party,
           paymentDate: paymentDate ? new Date(paymentDate) : existing.paymentDate,
           referenceNo: referenceNo !== undefined ? referenceNo?.trim() || null : existing.referenceNo,
-          description: description !== undefined ? description?.trim() || null : existing.description
+          description: description !== undefined ? description?.trim() || null : existing.description,
+          companyFundId: companyFundId !== undefined ? (companyFundId === 'none' || !companyFundId ? null : companyFundId) : existing.companyFundId
         },
         include: {
           company: true,
           account: true,
           category: true,
-          attachments: true
+          attachments: true,
+          companyFund: true
         }
       });
 

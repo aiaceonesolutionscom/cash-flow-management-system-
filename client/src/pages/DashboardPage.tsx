@@ -52,7 +52,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           companyId: selectedCompanyId,
           dateRange
         };
-        if (dateRange === 'custom' && startDate && endDate) {
+        if (startDate && endDate) {
           params.startDate = startDate;
           params.endDate = endDate;
         }
